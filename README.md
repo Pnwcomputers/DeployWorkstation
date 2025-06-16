@@ -25,7 +25,8 @@ Whether you’re imaging bare metal or cleaning up an existing PC, DeployWorksta
 
 1. **Copy** the `DeployWorkstation.ps1` and its `.cmd` launcher onto your USB or network share.  
 2. **Double-click** the `.cmd` (or run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\DeployWorkstation.ps1`) to start.  
-3. **Let it run** unattended—when it finishes, it will pause for review and reboot for a clean, ready-to-use machine.
+3. **Let it run** unattended!
+4. When it finishes, it will pause for review and reboot for a clean, ready-to-use machine.
 
 DeployWorkstation turns what used to be a 30-step manual build into a single “plug-and-play” operation, saving hours on every workstation you configure. 
 Feel free to fork, tweak the app list, and contribute back!  
