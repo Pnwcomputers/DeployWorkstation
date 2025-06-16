@@ -13,7 +13,7 @@ Whether you’re imaging bare metal or cleaning up an existing PC, DeployWorksta
   Removes legacy features (Quick Assist, Remote Desktop, Mixed Reality, Game Bar, etc.) via WinGet, DISM and registry, and uninstalls enterprise software such as McAfee by parsing their UninstallStrings from the registry.
 
 - **Standard app install via WinGet**  
-  Installs your golden image of third-party tools (Malwarebytes, BleachBit, Chrome, .NET Runtimes, Java, Adobe Reader, Zoom, 7-Zip, VLC, QuickBooks, Pimsy, Furniture Wizard, etc.) in parallel or sequentially, with silent-install flags and built-in error logging.
+  Installs your golden image of third-party tools (Malwarebytes, BleachBit, Chrome, .NET Runtimes, Java, Adobe Reader, Zoom, 7-Zip, VLC, etc.) in parallel or sequentially, with silent-install flags and built-in error logging.
 
 - **Offline fallback support**  
   Bundles proprietary installers (MSIs/EXEs) on USB and runs them silently if Winget can’t reach the network or community feed.
