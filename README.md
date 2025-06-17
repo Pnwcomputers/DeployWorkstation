@@ -1,4 +1,4 @@
-# DeployWorkstation v3.0 - Modular Architecture
+# DeployWorkstation v2.0 - Modular Architecture
 
 DeployWorkstation is a PowerShell-based, zero-touch provisioning toolkit for Windows 10 & 11 workstations. Whether you're imaging bare metal or cleaning up an existing PC, DeployWorkstation handles the heavy lifting of bloatware removal, application installations, and system configuration through a flexible, modular architecture.
 
@@ -16,7 +16,7 @@ DeployWorkstation is a PowerShell-based, zero-touch provisioning toolkit for Win
 
 ## Modular Architecture
 
-DeployWorkstation v3.0 consists of these specialized modules:
+DeployWorkstation v2.0 consists of these specialized modules:
 
 - **DeployWorkstation.Core** - Core functionality, environment validation, and system utilities
 - **DeployWorkstation.Logging** - Centralized logging system with multiple output levels
@@ -98,7 +98,7 @@ DeployWorkstation/
 
 ## Benefits
 
-DeployWorkstation v3.0 transforms workstation provisioning from a complex, multi-hour manual process into a streamlined, automated operation:
+DeployWorkstation v2.0 transforms workstation provisioning from a complex, multi-hour manual process into a streamlined, automated operation:
 
 - **Time Savings** - Reduce 30+ manual steps to a single automated process
 - **Consistency** - Identical configuration across all deployed workstations  
