@@ -1,8 +1,9 @@
 # DeployWorkstation v2.0
 
+*This is a testing edition of the Version 2 I hope to release; which will allow this process to be compeleted for any/all user accounts on a Windows system.
+
 DeployWorkstation is a PowerShell-based, zero-touch provisioning toolkit proof of concept for Windows 10 & 11 workstations. 
 Whether you’re imaging bare metal or cleaning up an existing PC, DeployWorkstation handles the heavy lifting of standard software and Apps removal, as well as basic application installations.
-*This is a testing edition of the Version 2 I hope to release; which will allow this process to be compeleted for any/all user accounts on a Windows system.
 
 - **Self-elevating & policy-bypassing**  
   Automatically relaunches under Windows PowerShell 5.1 with `-ExecutionPolicy Bypass` and UAC elevation, so you can double-click or run a single .cmd wrapper without tweaking system settings.
@@ -29,5 +30,10 @@ Whether you’re imaging bare metal or cleaning up an existing PC, DeployWorksta
 3. **Let it run** unattended!
 4. When it finishes, it will pause for review and reboot for a clean, ready-to-use machine.
 
-DeployWorkstation turns what used to be a 30-step manual build into a single “plug-and-play” operation, saving hours on every workstation you configure. 
-Feel free to fork, tweak the app list, and contribute back!  
+# With parameters
+.\DeployWorkstation-AllUsers.ps1 -SkipAppInstall -LogPath "C:\Logs\deploy.log"
+
+# Skip certain sections
+.\DeployWorkstation-AllUsers.ps1 -SkipBloatwareRemoval -SkipDefaultUserConfig
+
+DeployWorkstation turns what used to be a 30-step manual process into a single “plug-and-play” operation, saving you valuable time on every workstation you configure. Feel free to fork, tweak the app list/script, and contribute back!  
