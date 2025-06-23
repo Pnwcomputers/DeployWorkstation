@@ -1,4 +1,4 @@
-# DeployWorkstation.ps1 – Optimized Win10/11 Setup & Clean-up for ALL Users
+# DeployWorkstation-AllUsers.ps1 – Optimized Win10/11 Setup & Clean-up for ALL Users
 # Version: 2.1 - Enhanced for All Current and Future Users
 
 #Requires -Version 5.1
@@ -181,24 +181,91 @@ function Dismount-UserRegistryHives {
     Write-Log "Dismounting user registry hives..."
     
     foreach ($profile in $UserProfiles) {
+        $maxAttempts = 3
+        $attempt = 1
+        $dismountSuccess = $false
+        
         try {
             if (Test-Path "HKU:\$($profile.SID)") {
-                # Force garbage collection to release any handles
-                [System.GC]::Collect()
-                [System.GC]::WaitForPendingFinalizers()
+                Write-Log "Dismounting registry hive for: $($profile.Username)"
                 
-                reg unload "HKU\$($profile.SID)" 2>$null
-                if ($LASTEXITCODE -eq 0) {
-                    Write-Log "Dismounted registry hive for: $($profile.Username)"
-                } else {
-                    Write-Log "Failed to dismount registry hive for: $($profile.Username) (Exit code: $LASTEXITCODE)" -Level 'WARN'
+                while ($attempt -le $maxAttempts -and -not $dismountSuccess) {
+                    Write-Log "Dismount attempt $attempt of $maxAttempts for: $($profile.Username)"
+                    
+                    # Force garbage collection and wait for finalizers
+                    [System.GC]::Collect()
+                    [System.GC]::WaitForPendingFinalizers()
+                    [System.GC]::Collect()
+                    
+                    # Wait for any registry handles to be released
+                    Start-Sleep -Seconds 2
+                    
+                    # Close any open registry keys for this hive
+                    try {
+                        $registryKey = [Microsoft.Win32.Registry]::Users.OpenSubKey($profile.SID, $false)
+                        if ($registryKey) {
+                            $registryKey.Close()
+                            $registryKey.Dispose()
+                        }
+                    }
+                    catch {
+                        # Registry key might not be open, continue
+                    }
+                    
+                    # Additional wait before unmount attempt
+                    Start-Sleep -Seconds 1
+                    
+                    # Attempt to unmount
+                    reg unload "HKU\$($profile.SID)" 2>$null
+                    $exitCode = $LASTEXITCODE
+                    
+                    if ($exitCode -eq 0) {
+                        Write-Log "Successfully dismounted registry hive for: $($profile.Username)"
+                        $dismountSuccess = $true
+                    } else {
+                        Write-Log "Dismount attempt $attempt failed for $($profile.Username) (Exit code: $exitCode)" -Level 'WARN'
+                        
+                        if ($attempt -lt $maxAttempts) {
+                            # Wait longer between attempts
+                            Write-Log "Waiting before retry..." -Level 'INFO'
+                            Start-Sleep -Seconds 5
+                        }
+                    }
+                    
+                    $attempt++
                 }
+                
+                if (-not $dismountSuccess) {
+                    Write-Log "Failed to dismount registry hive for $($profile.Username) after $maxAttempts attempts. This may not affect system functionality." -Level 'WARN'
+                    
+                    # Log additional diagnostic information
+                    try {
+                        $handles = Get-Process | Where-Object { $_.ProcessName -eq "reg" }
+                        if ($handles) {
+                            Write-Log "Found $($handles.Count) reg.exe processes that may be holding handles" -Level 'INFO'
+                        }
+                    }
+                    catch {
+                        # Ignore errors in diagnostic logging
+                    }
+                }
+            } else {
+                Write-Log "Registry hive not mounted for: $($profile.Username)"
             }
         }
         catch {
-            Write-Log "Failed to dismount registry for $($profile.Username): $($_.Exception.Message)" -Level 'WARN'
+            Write-Log "Error during dismount process for $($profile.Username): $($_.Exception.Message)" -Level 'ERROR'
         }
     }
+    
+    # Final cleanup - force garbage collection one more time
+    Write-Log "Performing final cleanup..."
+    [System.GC]::Collect()
+    [System.GC]::WaitForPendingFinalizers()
+    [System.GC]::Collect()
+    
+    # Wait a moment for system to stabilize
+    Start-Sleep -Seconds 2
 }
 
 # ================================
@@ -563,6 +630,8 @@ function Set-DefaultUserProfile {
         return
     }
     
+    $defaultUserMounted = $false
+    
     try {
         # Verify HKU drive exists
         if (-not (Get-PSDrive -Name HKU -ErrorAction SilentlyContinue)) {
@@ -576,10 +645,12 @@ function Set-DefaultUserProfile {
         # Mount default user profile
         $defaultUserPath = "${env:SystemDrive}\Users\Default\NTUSER.DAT"
         if (Test-Path $defaultUserPath) {
+            Write-Log "Mounting default user registry hive from: $defaultUserPath"
             reg load "HKU\DefaultUser" $defaultUserPath 2>$null
             
             if ($LASTEXITCODE -eq 0) {
-                Write-Log "Mounted default user registry hive"
+                $defaultUserMounted = $true
+                Write-Log "Successfully mounted default user registry hive"
                 
                 # Wait for registry to be available
                 Start-Sleep -Seconds 3
@@ -641,19 +712,6 @@ function Set-DefaultUserProfile {
                         Write-Log "Error setting default user registry key $keyPath`: $($_.Exception.Message)" -Level 'WARN'
                     }
                 }
-                
-                # Force garbage collection before unmounting
-                [System.GC]::Collect()
-                [System.GC]::WaitForPendingFinalizers()
-                Start-Sleep -Seconds 2
-                
-                # Unmount default user hive
-                reg unload "HKU\DefaultUser" 2>$null
-                if ($LASTEXITCODE -eq 0) {
-                    Write-Log "Default user profile configured successfully"
-                } else {
-                    Write-Log "Warning: Failed to unmount default user hive (Exit code: $LASTEXITCODE)" -Level 'WARN'
-                }
             } else {
                 Write-Log "Failed to mount default user registry hive (Exit code: $LASTEXITCODE)" -Level 'WARN'
             }
@@ -663,6 +721,56 @@ function Set-DefaultUserProfile {
     }
     catch {
         Write-Log "Error configuring default user profile: $($_.Exception.Message)" -Level 'ERROR'
+    }
+    finally {
+        # Enhanced unmount process for default user
+        if ($defaultUserMounted) {
+            Write-Log "Unmounting default user registry hive..."
+            
+            $maxAttempts = 3
+            $attempt = 1
+            $unmountSuccess = $false
+            
+            while ($attempt -le $maxAttempts -and -not $unmountSuccess) {
+                # Force garbage collection and handle cleanup
+                [System.GC]::Collect()
+                [System.GC]::WaitForPendingFinalizers()
+                [System.GC]::Collect()
+                
+                # Close any open registry handles
+                try {
+                    $registryKey = [Microsoft.Win32.Registry]::Users.OpenSubKey("DefaultUser", $false)
+                    if ($registryKey) {
+                        $registryKey.Close()
+                        $registryKey.Dispose()
+                    }
+                }
+                catch {
+                    # Registry key might not be open
+                }
+                
+                Start-Sleep -Seconds 2
+                
+                reg unload "HKU\DefaultUser" 2>$null
+                $exitCode = $LASTEXITCODE
+                
+                if ($exitCode -eq 0) {
+                    Write-Log "Successfully unmounted default user registry hive"
+                    $unmountSuccess = $true
+                } else {
+                    Write-Log "Default user unmount attempt $attempt failed (Exit code: $exitCode)" -Level 'WARN'
+                    if ($attempt -lt $maxAttempts) {
+                        Start-Sleep -Seconds 3
+                    }
+                }
+                
+                $attempt++
+            }
+            
+            if (-not $unmountSuccess) {
+                Write-Log "Failed to unmount default user hive after $maxAttempts attempts. This may not affect functionality." -Level 'WARN'
+            }
+        }
     }
 }
 
@@ -796,8 +904,13 @@ try {
     # Configure default user profile for future accounts
     Set-DefaultUserProfile
     
-    # Clean up mounted registry hives
-    Dismount-UserRegistryHives -UserProfiles $userProfiles
+    # Clean up mounted registry hives with enhanced error handling
+    if ($userProfiles -and $userProfiles.Count -gt 0) {
+        Write-Log "Starting registry cleanup process..."
+        Dismount-UserRegistryHives -UserProfiles $userProfiles
+    } else {
+        Write-Log "No user profiles to dismount"
+    }
     
     Write-Log "===== DeployWorkstation-AllUsers.ps1 Completed Successfully ====="
     Write-Host "`n*** Setup complete for ALL users (current and future)! Log saved to: $LogPath ***" -ForegroundColor Green
@@ -810,8 +923,14 @@ catch {
     Write-Host "`n*** Setup failed! Check log at: $LogPath ***" -ForegroundColor Red
     
     # Ensure registry hives are cleaned up even on error
-    if ($userProfiles) {
-        Dismount-UserRegistryHives -UserProfiles $userProfiles
+    if ($userProfiles -and $userProfiles.Count -gt 0) {
+        Write-Log "Emergency cleanup: Dismounting registry hives due to error..."
+        try {
+            Dismount-UserRegistryHives -UserProfiles $userProfiles
+        }
+        catch {
+            Write-Log "Emergency cleanup failed: $($_.Exception.Message)" -Level 'ERROR'
+        }
     }
     
     exit 1
