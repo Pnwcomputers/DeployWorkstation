@@ -341,11 +341,13 @@ function Set-SystemConfigurationAllUsers {
     try {
         # Machine-wide policies (affects all users)
         $systemSettings = @{
-            # Disable Windows Consumer Features for all users
+            # Disable Windows Consumer Features and Tips for all users
             'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' = @{
                 'DisableWindowsConsumerFeatures' = 1
                 'DisableConsumerAccountStateContent' = 1
                 'DisableTailoredExperiencesWithDiagnosticData' = 1
+                'DisableSoftLanding' = 1
+                'DisableWindowsSpotlightFeatures' = 1
             }
             
             # Disable Windows Telemetry
@@ -367,12 +369,6 @@ function Set-SystemConfigurationAllUsers {
             # Disable advertising ID
             'HKLM:\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo' = @{
                 'DisabledByGroupPolicy' = 1
-            }
-            
-            # Disable Windows Tips
-            'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' = @{
-                'DisableSoftLanding' = 1
-                'DisableWindowsSpotlightFeatures' = 1
             }
             
             # Disable OneDrive for all users
