@@ -37,7 +37,7 @@ DeployWorkstation turns what used to be a 30-60 minute manual process into a sin
 .\DeployWorkstation-AllUsers.ps1 -SkipBloatwareRemoval -SkipDefaultUserConfig
 
 
-# Apps Removed by DeployWorkstation-AllUsers.ps1
+# Apps Removed by DeployWorkstation.ps1
 This lists all o the applications, packages, and services that are automatically removed or disabled by the script to create a cleaner, more secure Windows environment.
 
 ## 🗑️ Winget Applications Removed
@@ -160,7 +160,7 @@ These Windows services are stopped and disabled:
 - Content delivery settings
 - All promotional content
 
-# Apps Installed by DeployWorkstation-AllUsers.ps1
+# Apps Installed by DeployWorkstation.ps1
 This lists all of the applications that are automatically installed by the script to provide essential functionality for a Windows workstation.
 
 ## 📦 Standard Applications Installed
