@@ -1,4 +1,4 @@
-# DeployWorkstation-AllUsers.ps1 – Optimized Win10/11 Setup & Clean-up for ALL Users
+# DeployWorkstation.ps1 – Optimized Win10/11 Setup & Clean-up for ALL Users
 # Version: 2.1 - Enhanced for All Current and Future Users
 
 #Requires -Version 5.1
@@ -76,8 +76,16 @@ function Initialize-RegistryDrives {
     # Create HKU: drive if it doesn't exist
     if (-not (Get-PSDrive -Name HKU -ErrorAction SilentlyContinue)) {
         try {
-            New-PSDrive -Name HKU -PSProvider Registry -Root HKEY_USERS | Out-Null
+            New-PSDrive -Name HKU -PSProvider Registry -Root HKEY_USERS -Scope Global | Out-Null
             Write-Log "Created HKU: PowerShell drive"
+            
+            # Verify the drive was created
+            if (Get-PSDrive -Name HKU -ErrorAction SilentlyContinue) {
+                Write-Log "HKU: drive verified successfully"
+            } else {
+                Write-Log "HKU: drive creation failed - drive not found after creation" -Level 'ERROR'
+                return $false
+            }
         }
         catch {
             Write-Log "Failed to create HKU: drive: $($_.Exception.Message)" -Level 'ERROR'
@@ -556,6 +564,15 @@ function Set-DefaultUserProfile {
     }
     
     try {
+        # Verify HKU drive exists
+        if (-not (Get-PSDrive -Name HKU -ErrorAction SilentlyContinue)) {
+            Write-Log "HKU: drive not available, attempting to recreate..." -Level 'WARN'
+            if (-not (Initialize-RegistryDrives)) {
+                Write-Log "Cannot configure default user profile - HKU drive unavailable" -Level 'ERROR'
+                return
+            }
+        }
+        
         # Mount default user profile
         $defaultUserPath = "${env:SystemDrive}\Users\Default\NTUSER.DAT"
         if (Test-Path $defaultUserPath) {
@@ -565,7 +582,7 @@ function Set-DefaultUserProfile {
                 Write-Log "Mounted default user registry hive"
                 
                 # Wait for registry to be available
-                Start-Sleep -Seconds 2
+                Start-Sleep -Seconds 3
                 
                 # Configure settings for new users
                 $defaultUserSettings = @{
@@ -603,7 +620,14 @@ function Set-DefaultUserProfile {
                     $fullPath = "HKU:\DefaultUser\$keyPath"
                     
                     try {
+                        # Verify HKU drive is still available
+                        if (-not (Test-Path "HKU:\")) {
+                            Write-Log "HKU: drive became unavailable during configuration" -Level 'ERROR'
+                            break
+                        }
+                        
                         if (-not (Test-Path $fullPath)) {
+                            Write-Log "Creating registry path: $fullPath"
                             New-Item -Path $fullPath -Force | Out-Null
                         }
                         
@@ -621,13 +645,20 @@ function Set-DefaultUserProfile {
                 # Force garbage collection before unmounting
                 [System.GC]::Collect()
                 [System.GC]::WaitForPendingFinalizers()
+                Start-Sleep -Seconds 2
                 
                 # Unmount default user hive
                 reg unload "HKU\DefaultUser" 2>$null
-                Write-Log "Default user profile configured successfully"
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Log "Default user profile configured successfully"
+                } else {
+                    Write-Log "Warning: Failed to unmount default user hive (Exit code: $LASTEXITCODE)" -Level 'WARN'
+                }
             } else {
                 Write-Log "Failed to mount default user registry hive (Exit code: $LASTEXITCODE)" -Level 'WARN'
             }
+        } else {
+            Write-Log "Default user profile not found at: $defaultUserPath" -Level 'WARN'
         }
     }
     catch {
