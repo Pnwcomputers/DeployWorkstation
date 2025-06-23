@@ -92,6 +92,68 @@ Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent" -Name 
 Get-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Privacy" -Name "TailoredExperiencesWithDiagnosticDataEnabled" -ErrorAction SilentlyContinue
 ```
 
+### 🔗 **Related Issues**
+- **Issue #1**: HKU drive not found error
+- **Issue #2**: PropertyType parameter not recognized
+- **Issue #3**: Registry settings not applying to user profiles
+ Registry Hive Dismount Improvements
+
+🎯 Key Enhancements:
+1. Retry Logic with Intelligent Backoff
+3 attempts per registry hive with increasing delays
+Progressive wait times: 2s → 5s → final attempt
+Success tracking to avoid unnecessary retries
+
+2. Enhanced Handle Management
+Explicit registry key cleanup using .NET Registry classes
+Triple garbage collection (collect → finalize → collect)
+Extended wait periods for handles to be released
+Process diagnostics to identify handle conflicts
+
+3. Better Error Classification
+Success/Warning/Error levels with appropriate messaging
+Diagnostic information for troubleshooting
+Non-critical failure handling (dismount failures often don't affect functionality)
+
+4. Improved Default User Handling
+Finally block ensures unmount attempts even on errors
+Separate retry logic for default user profile
+Mount state tracking to avoid unmounting non-mounted hives
+
+5. Enhanced Error Recovery
+Emergency cleanup in catch blocks
+Null checking for user profiles array
+Graceful degradation when cleanup fails
+
+🔍 New Log Messages:
+Success Cases:
+[INFO] Successfully dismounted registry hive for: Username
+[INFO] Successfully unmounted default user registry hive
+
+Retry Cases:
+[WARN] Dismount attempt 1 failed for Username (Exit code: 1)
+[INFO] Waiting before retry...
+[INFO] Dismount attempt 2 of 3 for: Username
+
+Diagnostic Info:
+[INFO] Found 2 reg.exe processes that may be holding handles
+[WARN] Failed to dismount registry hive for Username after 3 attempts. This may not affect system functionality.
+
+⚙️ Technical Details:
+Handle Cleanup Process:
+Garbage Collection - Release managed references
+Registry Key Closure - Explicitly close .NET registry handles
+Process Diagnostics - Check for conflicting reg.exe processes
+Delayed Retry - Allow system time to release resources
+
+Retry Strategy:
+Attempt 1: Immediate after cleanup (2s delay)
+Attempt 2: 5s delay for handle release
+Attempt 3: Final attempt with extended cleanup
+
+**Compatibility**: Windows 10 (1809+), Windows 11  
+**Prerequisites**: PowerShell 5.1+, Administrator privileges, Winget installed
+
 ### 📋 **Testing Environment**
 - **OS**: Windows 10/11
 - **PowerShell Version**: 5.1 (Windows PowerShell Desktop)
@@ -99,11 +161,3 @@ Get-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Privacy" -Name
 - **Execution**: Administrator privileges required
 - **Result**: Script completed successfully with registry settings properly applied
 
-### 🔗 **Related Issues**
-- **Issue #1**: HKU drive not found error
-- **Issue #2**: PropertyType parameter not recognized
-- **Issue #3**: Registry settings not applying to user profiles
-
-**Next Version**: 2.1.2 (Planned improvements to registry hive dismount handling)  
-**Compatibility**: Windows 10 (1809+), Windows 11  
-**Prerequisites**: PowerShell 5.1+, Administrator privileges, Winget installed
