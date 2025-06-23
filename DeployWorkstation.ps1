@@ -756,4 +756,26 @@ try {
     Set-SystemConfigurationAllUsers
     
     # Configure existing user profiles
-    Configure-AllUserProfiles -UserProfiles $userPro
+    Configure-AllUserProfiles -UserProfiles $userProfiles
+
+    # Configure the Default user hive (for any future accounts)
+    Set-DefaultUserProfile
+
+} 
+
+catch {
+    Write-Log "Unhandled error in DeployWorkstation-AllUsers.ps1: $_" -Level 'ERROR'
+    exit 1
+}
+
+finally {
+    Write-Log "=== Cleaning up ==="
+
+    # Unmount all the user registry hives
+    Dismount-UserRegistryHives -UserProfiles $userProfiles
+
+    # Remove the HKU: drive we created
+    Remove-RegistryDrives
+
+    Write-Log "===== DeployWorkstation-AllUsers.ps1 Completed ====="
+}
