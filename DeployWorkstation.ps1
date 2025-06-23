@@ -1,5 +1,5 @@
-# DeployWorkstation.ps1 – Optimized Win10/11 Setup & Clean-up
-# Version: 2.0
+# DeployWorkstation-AllUsers.ps1 – Optimized Win10/11 Setup & Clean-up for ALL Users
+# Version: 2.1 - Enhanced for All Current and Future Users
 
 #Requires -Version 5.1
 #Requires -RunAsAdministrator
@@ -8,7 +8,8 @@
 param(
     [string]$LogPath,
     [switch]$SkipAppInstall,
-    [switch]$SkipBloatwareRemoval
+    [switch]$SkipBloatwareRemoval,
+    [switch]$SkipDefaultUserConfig
 )
 
 # ================================
@@ -24,7 +25,7 @@ if (-not $PSScriptRoot) {
 }
 
 if (-not $LogPath) {
-    $LogPath = Join-Path $PSScriptRoot "DeployWorkstation.log"
+    $LogPath = Join-Path $PSScriptRoot "DeployWorkstation-AllUsers.log"
 }
 
 # Ensure we're in Windows PowerShell Desktop for Appx cmdlets
@@ -37,6 +38,7 @@ if ($PSVersionTable.PSEdition -eq 'Core') {
     )
     if ($SkipAppInstall) { $params += '-SkipAppInstall' }
     if ($SkipBloatwareRemoval) { $params += '-SkipBloatwareRemoval' }
+    if ($SkipDefaultUserConfig) { $params += '-SkipDefaultUserConfig' }
     
     Start-Process -FilePath 'powershell.exe' -ArgumentList $params -Verb RunAs
     exit
@@ -57,7 +59,7 @@ if (-not (Test-Path $logDir)) {
     New-Item -Path $logDir -ItemType Directory -Force | Out-Null
 }
 
-Write-Log "===== DeployWorkstation.ps1 Started ====="
+Write-Log "===== DeployWorkstation-AllUsers.ps1 Started ====="
 Write-Log "PowerShell Version: $($PSVersionTable.PSVersion)"
 Write-Log "OS Version: $((Get-CimInstance Win32_OperatingSystem).Caption)"
 
@@ -65,7 +67,374 @@ Write-Log "OS Version: $((Get-CimInstance Win32_OperatingSystem).Caption)"
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 
 # ================================
-# Winget Management
+# User Profile Management
+# ================================
+
+function Get-AllUserProfiles {
+    Write-Log "Discovering user profiles..."
+    
+    $profiles = @()
+    
+    # Get all user profiles from registry
+    $profileListPath = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList'
+    Get-ChildItem $profileListPath | ForEach-Object {
+        $profilePath = (Get-ItemProperty $_.PSPath -Name ProfileImagePath -ErrorAction SilentlyContinue).ProfileImagePath
+        $sid = $_.PSChildName
+        
+        if ($profilePath -and (Test-Path $profilePath) -and $profilePath -notlike '*\systemprofile*' -and $profilePath -notlike '*\LocalService*' -and $profilePath -notlike '*\NetworkService*') {
+            $username = Split-Path $profilePath -Leaf
+            $profiles += @{
+                Username = $username
+                ProfilePath = $profilePath
+                SID = $sid
+                RegistryPath = "HKU:\$sid"
+            }
+        }
+    }
+    
+    Write-Log "Found $($profiles.Count) user profiles"
+    return $profiles
+}
+
+function Mount-UserRegistryHives {
+    param([array]$UserProfiles)
+    
+    Write-Log "Mounting user registry hives..."
+    
+    foreach ($profile in $UserProfiles) {
+        $ntUserPath = Join-Path $profile.ProfilePath "NTUSER.DAT"
+        
+        if (Test-Path $ntUserPath) {
+            try {
+                # Check if already mounted
+                if (-not (Test-Path "HKU:\$($profile.SID)")) {
+                    reg load "HKU\$($profile.SID)" $ntUserPath 2>$null
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Log "Mounted registry hive for: $($profile.Username)"
+                    }
+                } else {
+                    Write-Log "Registry hive already mounted for: $($profile.Username)"
+                }
+            }
+            catch {
+                Write-Log "Failed to mount registry for $($profile.Username): $($_.Exception.Message)" -Level 'WARN'
+            }
+        }
+    }
+}
+
+function Dismount-UserRegistryHives {
+    param([array]$UserProfiles)
+    
+    Write-Log "Dismounting user registry hives..."
+    
+    foreach ($profile in $UserProfiles) {
+        try {
+            if (Test-Path "HKU:\$($profile.SID)") {
+                reg unload "HKU\$($profile.SID)" 2>$null
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Log "Dismounted registry hive for: $($profile.Username)"
+                }
+            }
+        }
+        catch {
+            Write-Log "Failed to dismount registry for $($profile.Username): $($_.Exception.Message)" -Level 'WARN'
+        }
+    }
+}
+
+# ================================
+# Enhanced Bloatware Removal Functions
+# ================================
+
+function Remove-AppxPackagesAllUsers {
+    Write-Log "Removing UWP/Appx packages for all users..."
+    
+    $packagesToRemove = @(
+        '*Microsoft.OutlookForWindows*',
+        '*Clipchamp*',
+        '*MicrosoftFamily*',
+        '*OneDrive*',
+        '*LinkedIn*',
+        '*Xbox*',
+        '*Skype*',
+        '*MixedReality*',
+        '*RemoteDesktop*',
+        '*QuickAssist*',
+        '*MicrosoftTeams*',
+        '*Disney*',
+        '*Netflix*',
+        '*Spotify*',
+        '*TikTok*',
+        '*Instagram*',
+        '*Facebook*',
+        '*Candy*',
+        '*Twitter*',
+        '*Minecraft*'
+    )
+    
+    foreach ($packagePattern in $packagesToRemove) {
+        Write-Log "Processing Appx package: $packagePattern"
+        
+        try {
+            # Remove for all users (current and future)
+            $packages = Get-AppxPackage -AllUsers -Name $packagePattern -ErrorAction SilentlyContinue
+            foreach ($package in $packages) {
+                Write-Log "Removing package for all users: $($package.Name)"
+                Remove-AppxPackage -Package $package.PackageFullName -AllUsers -ErrorAction SilentlyContinue
+            }
+            
+            # Remove provisioned packages (affects new user accounts)
+            $provisionedPackages = Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue |
+                                 Where-Object { $_.DisplayName -like $packagePattern }
+            
+            foreach ($package in $provisionedPackages) {
+                Write-Log "Removing provisioned package: $($package.DisplayName)"
+                Remove-AppxProvisionedPackage -Online -PackageName $package.PackageName -ErrorAction SilentlyContinue
+            }
+        }
+        catch {
+            Write-Log "Error removing $packagePattern`: $($_.Exception.Message)" -Level 'WARN'
+        }
+    }
+}
+
+function Set-DefaultUserProfile {
+    Write-Log "Configuring default user profile for future accounts..."
+    
+    if ($SkipDefaultUserConfig) {
+        Write-Log "Skipping default user configuration (SkipDefaultUserConfig flag set)"
+        return
+    }
+    
+    try {
+        # Mount default user profile
+        $defaultUserPath = "${env:SystemDrive}\Users\Default\NTUSER.DAT"
+        if (Test-Path $defaultUserPath) {
+            reg load "HKU\DefaultUser" $defaultUserPath 2>$null
+            
+            if ($LASTEXITCODE -eq 0) {
+                Write-Log "Mounted default user registry hive"
+                
+                # Configure settings for new users
+                $defaultUserSettings = @{
+                    # Disable consumer features
+                    'SOFTWARE\Policies\Microsoft\Windows\CloudContent' = @{
+                        'DisableWindowsConsumerFeatures' = 1
+                        'DisableConsumerAccountStateContent' = 1
+                        'DisableTailoredExperiencesWithDiagnosticData' = 1
+                    }
+                    
+                    # Privacy settings
+                    'SOFTWARE\Microsoft\Windows\CurrentVersion\Privacy' = @{
+                        'TailoredExperiencesWithDiagnosticDataEnabled' = 0
+                    }
+                    
+                    # Disable suggestions and tips
+                    'SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' = @{
+                        'SilentInstalledAppsEnabled' = 0
+                        'SystemPaneSuggestionsEnabled' = 0
+                        'SoftLandingEnabled' = 0
+                        'RotatingLockScreenEnabled' = 0
+                        'RotatingLockScreenOverlayEnabled' = 0
+                        'SubscribedContent-310093Enabled' = 0
+                        'SubscribedContent-314559Enabled' = 0
+                        'SubscribedContent-338387Enabled' = 0
+                        'SubscribedContent-338388Enabled' = 0
+                        'SubscribedContent-338389Enabled' = 0
+                        'SubscribedContent-338393Enabled' = 0
+                        'SubscribedContent-353694Enabled' = 0
+                        'SubscribedContent-353696Enabled' = 0
+                    }
+                }
+                
+                foreach ($keyPath in $defaultUserSettings.Keys) {
+                    $fullPath = "HKU:\DefaultUser\$keyPath"
+                    
+                    if (-not (Test-Path $fullPath)) {
+                        New-Item -Path $fullPath -Force | Out-Null
+                    }
+                    
+                    foreach ($valueName in $defaultUserSettings[$keyPath].Keys) {
+                        $value = $defaultUserSettings[$keyPath][$valueName]
+                        Set-ItemProperty -Path $fullPath -Name $valueName -Value $value -Type DWord -Force
+                        Write-Log "Set default user setting: $keyPath\$valueName = $value"
+                    }
+                }
+                
+                # Unmount default user hive
+                reg unload "HKU\DefaultUser" 2>$null
+                Write-Log "Default user profile configured successfully"
+            }
+        }
+    }
+    catch {
+        Write-Log "Error configuring default user profile: $($_.Exception.Message)" -Level 'ERROR'
+    }
+}
+
+function Configure-AllUserProfiles {
+    param([array]$UserProfiles)
+    
+    Write-Log "Configuring settings for all existing user profiles..."
+    
+    foreach ($profile in $UserProfiles) {
+        Write-Log "Configuring profile: $($profile.Username)"
+        
+        try {
+            if (Test-Path $profile.RegistryPath) {
+                # Configure user-specific settings
+                $userSettings = @{
+                    # Disable OneDrive
+                    'SOFTWARE\Microsoft\Windows\CurrentVersion\Run' = @{
+                        'OneDriveSetup' = $null  # Remove OneDrive startup
+                    }
+                    
+                    # Privacy settings
+                    'SOFTWARE\Microsoft\Windows\CurrentVersion\Privacy' = @{
+                        'TailoredExperiencesWithDiagnosticDataEnabled' = 0
+                    }
+                    
+                    # Disable Windows tips and suggestions
+                    'SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' = @{
+                        'SilentInstalledAppsEnabled' = 0
+                        'SystemPaneSuggestionsEnabled' = 0
+                        'SoftLandingEnabled' = 0
+                    }
+                }
+                
+                foreach ($keyPath in $userSettings.Keys) {
+                    $fullPath = "$($profile.RegistryPath)\$keyPath"
+                    
+                    if (-not (Test-Path $fullPath)) {
+                        New-Item -Path $fullPath -Force | Out-Null
+                    }
+                    
+                    foreach ($valueName in $userSettings[$keyPath].Keys) {
+                        $value = $userSettings[$keyPath][$valueName]
+                        
+                        if ($null -eq $value) {
+                            # Remove the value
+                            Remove-ItemProperty -Path $fullPath -Name $valueName -ErrorAction SilentlyContinue
+                            Write-Log "Removed $($profile.Username) setting: $keyPath\$valueName"
+                        } else {
+                            Set-ItemProperty -Path $fullPath -Name $valueName -Value $value -Type DWord -Force
+                            Write-Log "Set $($profile.Username) setting: $keyPath\$valueName = $value"
+                        }
+                    }
+                }
+            }
+        }
+        catch {
+            Write-Log "Error configuring profile $($profile.Username): $($_.Exception.Message)" -Level 'WARN'
+        }
+    }
+}
+
+# ================================
+# Enhanced System Configuration
+# ================================
+
+function Set-SystemConfigurationAllUsers {
+    Write-Log "Configuring system-wide settings for all users..."
+    
+    try {
+        # Machine-wide policies (affects all users)
+        $systemSettings = @{
+            # Disable Windows Consumer Features for all users
+            'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' = @{
+                'DisableWindowsConsumerFeatures' = 1
+                'DisableConsumerAccountStateContent' = 1
+                'DisableTailoredExperiencesWithDiagnosticData' = 1
+            }
+            
+            # Disable Windows Telemetry
+            'HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection' = @{
+                'AllowTelemetry' = 0
+                'MaxTelemetryAllowed' = 0
+            }
+            
+            # Disable Windows Error Reporting
+            'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting' = @{
+                'Disabled' = 1
+            }
+            
+            # Disable Customer Experience Improvement Program
+            'HKLM:\SOFTWARE\Microsoft\SQMClient\Windows' = @{
+                'CEIPEnable' = 0
+            }
+            
+            # Disable advertising ID
+            'HKLM:\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo' = @{
+                'DisabledByGroupPolicy' = 1
+            }
+            
+            # Disable Windows Tips
+            'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' = @{
+                'DisableSoftLanding' = 1
+                'DisableWindowsSpotlightFeatures' = 1
+            }
+            
+            # Disable OneDrive for all users
+            'HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive' = @{
+                'DisableFileSyncNGSC' = 1
+                'DisableFileSync' = 1
+            }
+        }
+        
+        foreach ($keyPath in $systemSettings.Keys) {
+            if (-not (Test-Path $keyPath)) {
+                New-Item -Path $keyPath -Force | Out-Null
+            }
+            
+            foreach ($valueName in $systemSettings[$keyPath].Keys) {
+                $value = $systemSettings[$keyPath][$valueName]
+                Set-ItemProperty -Path $keyPath -Name $valueName -Value $value -Type DWord -Force
+                Write-Log "Set system setting: $keyPath\$valueName = $value"
+            }
+        }
+        
+        # Disable Windows services that affect all users
+        $servicesToDisable = @(
+            'DiagTrack',  # Connected User Experiences and Telemetry
+            'dmwappushservice',  # WAP Push Message Routing Service
+            'lfsvc',  # Geolocation Service
+            'MapsBroker',  # Downloaded Maps Manager
+            'NetTcpPortSharing',  # Net.Tcp Port Sharing Service
+            'RemoteAccess',  # Routing and Remote Access
+            'RemoteRegistry',  # Remote Registry
+            'SharedAccess',  # Internet Connection Sharing
+            'TrkWks',  # Distributed Link Tracking Client
+            'WbioSrvc',  # Windows Biometric Service
+            'WMPNetworkSvc',  # Windows Media Player Network Sharing Service
+            'XblAuthManager',  # Xbox Live Auth Manager
+            'XblGameSave',  # Xbox Live Game Save Service
+            'XboxNetApiSvc'  # Xbox Live Networking Service
+        )
+        
+        foreach ($serviceName in $servicesToDisable) {
+            try {
+                $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+                if ($service) {
+                    Write-Log "Disabling service: $serviceName"
+                    Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
+                    Set-Service -Name $serviceName -StartupType Disabled -ErrorAction SilentlyContinue
+                }
+            }
+            catch {
+                Write-Log "Could not disable service $serviceName`: $($_.Exception.Message)" -Level 'WARN'
+            }
+        }
+        
+        Write-Log "System-wide configuration completed"
+    }
+    catch {
+        Write-Log "Error configuring system: $($_.Exception.Message)" -Level 'ERROR'
+    }
+}
+
+# ================================
+# Original Functions (Enhanced)
 # ================================
 
 function Test-Winget {
@@ -103,10 +472,6 @@ function Initialize-WingetSources {
     }
 }
 
-# ================================
-# Bloatware Removal Functions
-# ================================
-
 function Remove-WingetApps {
     param([string[]]$AppPatterns)
     
@@ -142,48 +507,6 @@ function Remove-WingetApps {
     }
 }
 
-function Remove-AppxPackages {
-    Write-Log "Removing UWP/Appx packages..."
-    
-    $packagesToRemove = @(
-        '*Microsoft.OutlookForWindows*',
-        '*Clipchamp*',
-        '*MicrosoftFamily*',
-        '*OneDrive*',
-        '*LinkedIn*',
-        '*Xbox*',
-        '*Skype*',
-        '*MixedReality*',
-        '*RemoteDesktop*',
-        '*QuickAssist*'
-    )
-    
-    foreach ($packagePattern in $packagesToRemove) {
-        Write-Log "Processing Appx package: $packagePattern"
-        
-        try {
-            # Remove for all users
-            $packages = Get-AppxPackage -AllUsers -Name $packagePattern -ErrorAction SilentlyContinue
-            foreach ($package in $packages) {
-                Write-Log "Removing package: $($package.Name)"
-                Remove-AppxPackage -Package $package.PackageFullName -AllUsers -ErrorAction SilentlyContinue
-            }
-            
-            # Remove provisioned packages
-            $provisionedPackages = Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue |
-                                 Where-Object { $_.DisplayName -like $packagePattern }
-            
-            foreach ($package in $provisionedPackages) {
-                Write-Log "Removing provisioned package: $($package.DisplayName)"
-                Remove-AppxProvisionedPackage -Online -PackageName $package.PackageName -ErrorAction SilentlyContinue
-            }
-        }
-        catch {
-            Write-Log "Error removing $packagePattern`: $($_.Exception.Message)" -Level 'WARN'
-        }
-    }
-}
-
 function Remove-WindowsCapabilities {
     Write-Log "Removing Windows optional features..."
     
@@ -192,7 +515,8 @@ function Remove-WindowsCapabilities {
         'App.Xbox.TCUI~~~~0.0.1.0',
         'App.XboxGameOverlay~~~~0.0.1.0',
         'App.XboxSpeechToTextOverlay~~~~0.0.1.0',
-        'OpenSSH.Client~~~~0.0.1.0'
+        'OpenSSH.Client~~~~0.0.1.0',
+        'Microsoft.Windows.PowerShell.ISE~~~~0.0.1.0'
     )
     
     foreach ($capability in $capabilitiesToRemove) {
@@ -266,10 +590,6 @@ function Remove-McAfeeProducts {
     }
 }
 
-# ================================
-# Application Installation
-# ================================
-
 function Install-StandardApps {
     Write-Log "Installing standard applications..."
     
@@ -310,43 +630,6 @@ function Install-StandardApps {
 }
 
 # ================================
-# System Configuration
-# ================================
-
-function Set-SystemConfiguration {
-    Write-Log "Configuring system settings..."
-    
-    try {
-        # Disable Windows Telemetry
-        Write-Log "Disabling Windows telemetry..."
-        $telemetryPath = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection'
-        
-        if (-not (Test-Path $telemetryPath)) {
-            New-Item -Path $telemetryPath -Force | Out-Null
-        }
-        
-        Set-ItemProperty -Path $telemetryPath -Name 'AllowTelemetry' -Value 0 -Type DWord -Force
-        
-        # Disable Windows Error Reporting
-        Write-Log "Disabling Windows Error Reporting..."
-        $werPath = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting'
-        Set-ItemProperty -Path $werPath -Name 'Disabled' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue
-        
-        # Disable Customer Experience Improvement Program
-        Write-Log "Disabling Customer Experience Improvement Program..."
-        $ceipPath = 'HKLM:\SOFTWARE\Microsoft\SQMClient\Windows'
-        if (Test-Path $ceipPath) {
-            Set-ItemProperty -Path $ceipPath -Name 'CEIPEnable' -Value 0 -Type DWord -Force
-        }
-        
-        Write-Log "System configuration completed"
-    }
-    catch {
-        Write-Log "Error configuring system: $($_.Exception.Message)" -Level 'ERROR'
-    }
-}
-
-# ================================
 # Main Execution
 # ================================
 
@@ -359,22 +642,30 @@ try {
     
     Initialize-WingetSources
     
+    # Get all user profiles
+    $userProfiles = Get-AllUserProfiles
+    
+    # Mount user registry hives for configuration
+    Mount-UserRegistryHives -UserProfiles $userProfiles
+    
     # Execute bloatware removal
     if (-not $SkipBloatwareRemoval) {
-        Write-Log "=== Starting Bloatware Removal ==="
+        Write-Log "=== Starting Enhanced Bloatware Removal for All Users ==="
         
         $bloatwarePatterns = @(
             'CoPilot', 'Outlook', 'Quick Assist', 'Remote Desktop',
             'Mixed Reality Portal', 'Clipchamp', 'Xbox', 'Family',
-            'Skype', 'LinkedIn', 'OneDrive', 'Teams'
+            'Skype', 'LinkedIn', 'OneDrive', 'Teams', 'Disney',
+            'Netflix', 'Spotify', 'TikTok', 'Instagram', 'Facebook',
+            'Candy', 'Twitter', 'Minecraft'
         )
         
         Remove-WingetApps -AppPatterns $bloatwarePatterns
-        Remove-AppxPackages
+        Remove-AppxPackagesAllUsers  # Enhanced version
         Remove-WindowsCapabilities
         Remove-McAfeeProducts
         
-        Write-Log "=== Bloatware Removal Completed ==="
+        Write-Log "=== Enhanced Bloatware Removal Completed ==="
     } else {
         Write-Log "Skipping bloatware removal (SkipBloatwareRemoval flag set)"
     }
@@ -388,11 +679,20 @@ try {
         Write-Log "Skipping application installation (SkipAppInstall flag set)"
     }
     
-    # Configure system settings
-    Set-SystemConfiguration
+    # Configure system settings for all users
+    Set-SystemConfigurationAllUsers
     
-    Write-Log "===== DeployWorkstation.ps1 Completed Successfully ====="
-    Write-Host "`n*** Setup complete! Log saved to: $LogPath ***" -ForegroundColor Green
+    # Configure existing user profiles
+    Configure-AllUserProfiles -UserProfiles $userProfiles
+    
+    # Configure default user profile for future accounts
+    Set-DefaultUserProfile
+    
+    # Clean up mounted registry hives
+    Dismount-UserRegistryHives -UserProfiles $userProfiles
+    
+    Write-Log "===== DeployWorkstation-AllUsers.ps1 Completed Successfully ====="
+    Write-Host "`n*** Setup complete for ALL users (current and future)! Log saved to: $LogPath ***" -ForegroundColor Green
     Write-Host "Press Enter to exit..." -ForegroundColor Yellow
     Read-Host | Out-Null
     
@@ -400,6 +700,12 @@ try {
 catch {
     Write-Log "Critical error: $($_.Exception.Message)" -Level 'ERROR'
     Write-Host "`n*** Setup failed! Check log at: $LogPath ***" -ForegroundColor Red
+    
+    # Ensure registry hives are cleaned up even on error
+    if ($userProfiles) {
+        Dismount-UserRegistryHives -UserProfiles $userProfiles
+    }
+    
     exit 1
 }
 finally {
