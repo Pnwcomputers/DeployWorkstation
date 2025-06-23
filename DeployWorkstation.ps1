@@ -67,6 +67,45 @@ Write-Log "OS Version: $((Get-CimInstance Win32_OperatingSystem).Caption)"
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 
 # ================================
+# Registry Drive Management
+# ================================
+
+function Initialize-RegistryDrives {
+    Write-Log "Initializing registry drives..."
+    
+    # Create HKU: drive if it doesn't exist
+    if (-not (Get-PSDrive -Name HKU -ErrorAction SilentlyContinue)) {
+        try {
+            New-PSDrive -Name HKU -PSProvider Registry -Root HKEY_USERS | Out-Null
+            Write-Log "Created HKU: PowerShell drive"
+        }
+        catch {
+            Write-Log "Failed to create HKU: drive: $($_.Exception.Message)" -Level 'ERROR'
+            return $false
+        }
+    } else {
+        Write-Log "HKU: drive already exists"
+    }
+    
+    return $true
+}
+
+function Remove-RegistryDrives {
+    Write-Log "Cleaning up registry drives..."
+    
+    # Remove HKU: drive if we created it
+    if (Get-PSDrive -Name HKU -ErrorAction SilentlyContinue) {
+        try {
+            Remove-PSDrive -Name HKU -Force -ErrorAction SilentlyContinue
+            Write-Log "Removed HKU: PowerShell drive"
+        }
+        catch {
+            Write-Log "Could not remove HKU: drive: $($_.Exception.Message)" -Level 'WARN'
+        }
+    }
+}
+
+# ================================
 # User Profile Management
 # ================================
 
@@ -111,6 +150,8 @@ function Mount-UserRegistryHives {
                     reg load "HKU\$($profile.SID)" $ntUserPath 2>$null
                     if ($LASTEXITCODE -eq 0) {
                         Write-Log "Mounted registry hive for: $($profile.Username)"
+                    } else {
+                        Write-Log "Failed to mount registry hive for: $($profile.Username) (Exit code: $LASTEXITCODE)" -Level 'WARN'
                     }
                 } else {
                     Write-Log "Registry hive already mounted for: $($profile.Username)"
@@ -121,6 +162,9 @@ function Mount-UserRegistryHives {
             }
         }
     }
+    
+    # Wait a moment for registry changes to be available
+    Start-Sleep -Seconds 2
 }
 
 function Dismount-UserRegistryHives {
@@ -131,9 +175,15 @@ function Dismount-UserRegistryHives {
     foreach ($profile in $UserProfiles) {
         try {
             if (Test-Path "HKU:\$($profile.SID)") {
+                # Force garbage collection to release any handles
+                [System.GC]::Collect()
+                [System.GC]::WaitForPendingFinalizers()
+                
                 reg unload "HKU\$($profile.SID)" 2>$null
                 if ($LASTEXITCODE -eq 0) {
                     Write-Log "Dismounted registry hive for: $($profile.Username)"
+                } else {
+                    Write-Log "Failed to dismount registry hive for: $($profile.Username) (Exit code: $LASTEXITCODE)" -Level 'WARN'
                 }
             }
         }
@@ -216,6 +266,9 @@ function Set-DefaultUserProfile {
             if ($LASTEXITCODE -eq 0) {
                 Write-Log "Mounted default user registry hive"
                 
+                # Wait for registry to be available
+                Start-Sleep -Seconds 2
+                
                 # Configure settings for new users
                 $defaultUserSettings = @{
                     # Disable consumer features
@@ -251,20 +304,31 @@ function Set-DefaultUserProfile {
                 foreach ($keyPath in $defaultUserSettings.Keys) {
                     $fullPath = "HKU:\DefaultUser\$keyPath"
                     
-                    if (-not (Test-Path $fullPath)) {
-                        New-Item -Path $fullPath -Force | Out-Null
+                    try {
+                        if (-not (Test-Path $fullPath)) {
+                            New-Item -Path $fullPath -Force | Out-Null
+                        }
+                        
+                        foreach ($valueName in $defaultUserSettings[$keyPath].Keys) {
+                            $value = $defaultUserSettings[$keyPath][$valueName]
+                            Set-ItemProperty -Path $fullPath -Name $valueName -Value $value -Type DWord -Force
+                            Write-Log "Set default user setting: $keyPath\$valueName = $value"
+                        }
                     }
-                    
-                    foreach ($valueName in $defaultUserSettings[$keyPath].Keys) {
-                        $value = $defaultUserSettings[$keyPath][$valueName]
-                        Set-ItemProperty -Path $fullPath -Name $valueName -Value $value -Type DWord -Force
-                        Write-Log "Set default user setting: $keyPath\$valueName = $value"
+                    catch {
+                        Write-Log "Error setting default user registry key $keyPath`: $($_.Exception.Message)" -Level 'WARN'
                     }
                 }
+                
+                # Force garbage collection before unmounting
+                [System.GC]::Collect()
+                [System.GC]::WaitForPendingFinalizers()
                 
                 # Unmount default user hive
                 reg unload "HKU\DefaultUser" 2>$null
                 Write-Log "Default user profile configured successfully"
+            } else {
+                Write-Log "Failed to mount default user registry hive (Exit code: $LASTEXITCODE)" -Level 'WARN'
             }
         }
     }
@@ -306,23 +370,30 @@ function Configure-AllUserProfiles {
                 foreach ($keyPath in $userSettings.Keys) {
                     $fullPath = "$($profile.RegistryPath)\$keyPath"
                     
-                    if (-not (Test-Path $fullPath)) {
-                        New-Item -Path $fullPath -Force | Out-Null
-                    }
-                    
-                    foreach ($valueName in $userSettings[$keyPath].Keys) {
-                        $value = $userSettings[$keyPath][$valueName]
+                    try {
+                        if (-not (Test-Path $fullPath)) {
+                            New-Item -Path $fullPath -Force | Out-Null
+                        }
                         
-                        if ($null -eq $value) {
-                            # Remove the value
-                            Remove-ItemProperty -Path $fullPath -Name $valueName -ErrorAction SilentlyContinue
-                            Write-Log "Removed $($profile.Username) setting: $keyPath\$valueName"
-                        } else {
-                            Set-ItemProperty -Path $fullPath -Name $valueName -Value $value -Type DWord -Force
-                            Write-Log "Set $($profile.Username) setting: $keyPath\$valueName = $value"
+                        foreach ($valueName in $userSettings[$keyPath].Keys) {
+                            $value = $userSettings[$keyPath][$valueName]
+                            
+                            if ($null -eq $value) {
+                                # Remove the value
+                                Remove-ItemProperty -Path $fullPath -Name $valueName -ErrorAction SilentlyContinue
+                                Write-Log "Removed $($profile.Username) setting: $keyPath\$valueName"
+                            } else {
+                                Set-ItemProperty -Path $fullPath -Name $valueName -Value $value -Type DWord -Force
+                                Write-Log "Set $($profile.Username) setting: $keyPath\$valueName = $value"
+                            }
                         }
                     }
+                    catch {
+                        Write-Log "Error setting registry key $keyPath for $($profile.Username): $($_.Exception.Message)" -Level 'WARN'
+                    }
                 }
+            } else {
+                Write-Log "Registry path not accessible for $($profile.Username): $($profile.RegistryPath)" -Level 'WARN'
             }
         }
         catch {
@@ -630,6 +701,12 @@ function Install-StandardApps {
 # ================================
 
 try {
+    # Initialize registry drives first
+    if (-not (Initialize-RegistryDrives)) {
+        Write-Log "Failed to initialize registry drives. Cannot continue." -Level 'ERROR'
+        exit 1
+    }
+    
     # Verify prerequisites
     if (-not (Test-Winget)) {
         Write-Log "Winget is required but not available. Please install App Installer from Microsoft Store." -Level 'ERROR'
@@ -679,32 +756,4 @@ try {
     Set-SystemConfigurationAllUsers
     
     # Configure existing user profiles
-    Configure-AllUserProfiles -UserProfiles $userProfiles
-    
-    # Configure default user profile for future accounts
-    Set-DefaultUserProfile
-    
-    # Clean up mounted registry hives
-    Dismount-UserRegistryHives -UserProfiles $userProfiles
-    
-    Write-Log "===== DeployWorkstation-AllUsers.ps1 Completed Successfully ====="
-    Write-Host "`n*** Setup complete for ALL users (current and future)! Log saved to: $LogPath ***" -ForegroundColor Green
-    Write-Host "Press Enter to exit..." -ForegroundColor Yellow
-    Read-Host | Out-Null
-    
-}
-catch {
-    Write-Log "Critical error: $($_.Exception.Message)" -Level 'ERROR'
-    Write-Host "`n*** Setup failed! Check log at: $LogPath ***" -ForegroundColor Red
-    
-    # Ensure registry hives are cleaned up even on error
-    if ($userProfiles) {
-        Dismount-UserRegistryHives -UserProfiles $userProfiles
-    }
-    
-    exit 1
-}
-finally {
-    # Cleanup
-    $ProgressPreference = 'Continue'
-}
+    Configure-AllUserProfiles -UserProfiles $userPro
