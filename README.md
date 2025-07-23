@@ -72,6 +72,7 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 - 🌐 Internet Connection (for WinGet packages)
 - 👤 Administrator Access
 - 💾 USB Drive or Network Share (Optional)
+- 🖥️ Current Version of "Application Installer" from Microsoft's App Store 
 
 ### Quick Start
 
