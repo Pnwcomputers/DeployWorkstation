@@ -297,7 +297,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - 📖 **Documentation**: Check this README and project wiki
 - 🐛 **Bug Reports**: Open an issue on GitHub
 - 💡 **Feature Requests**: Open an issue with [FEATURE] tag
-- 🔒 **Security Issues**: Email [security@pnwcomputers.com](mailto:security@pnwcomputers.com)
 - 💬 **General Support**: Email [support@pnwcomputers.com](mailto:support@pnwcomputers.com)
 
 ---
