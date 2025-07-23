@@ -1,5 +1,12 @@
 # 🚀 DeployWorkstation v1.0 (Testing)
 
+![Automation Level](https://img.shields.io/badge/Automation-Zero%20Touch-green)
+![Windows Support](https://img.shields.io/badge/Windows-10%20%7C%2011-blue)
+![PowerShell Version](https://img.shields.io/badge/PowerShell-5.1%2B-blue)
+![Enterprise Ready](https://img.shields.io/badge/Enterprise-Ready-purple)
+![GitHub issues](https://img.shields.io/github/issues/Pnwcomputers/DeployWorkstation)
+![Maintenance](https://img.shields.io/badge/Maintained-Yes-green)
+
 **Zero-Touch Windows Workstation Provisioning Toolkit**
 
 A PowerShell-based, automated provisioning solution that transforms Windows 10 & 11 workstation deployment from a 30-step manual process into a single "plug-and-play" operation. Whether you're imaging bare metal or cleaning up an existing PC, DeployWorkstation handles the heavy lifting of bloatware removal and essential application installation.
@@ -72,7 +79,6 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 - 🌐 Internet Connection (for WinGet packages)
 - 👤 Administrator Access
 - 💾 USB Drive or Network Share (Optional)
-- 🖥️ Current Version of "Application Installer" from Microsoft's App Store 
 
 ### Quick Start
 
@@ -297,6 +303,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - 📖 **Documentation**: Check this README and project wiki
 - 🐛 **Bug Reports**: Open an issue on GitHub
 - 💡 **Feature Requests**: Open an issue with [FEATURE] tag
+- 🔒 **Security Issues**: Email [security@pnwcomputers.com](mailto:security@pnwcomputers.com)
 - 💬 **General Support**: Email [support@pnwcomputers.com](mailto:support@pnwcomputers.com)
 
 ---
