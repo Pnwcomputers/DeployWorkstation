@@ -1,0 +1,22 @@
+# Logs
+*.log
+Logs/
+
+# Personal configurations
+Config/Personal/
+Config/*.local.*
+
+# Cached installers
+Installers/*.msi
+Installers/*.exe
+!Installers/.gitkeep
+
+# PowerShell specific
+*.ps1xml
+TestResults/
+coverage.xml
+
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
