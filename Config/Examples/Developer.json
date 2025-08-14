@@ -1,0 +1,39 @@
+{
+  "deployment_profile": "developer",
+  "description": "Developer workstation with programming tools",
+  "bloatware_removal": {
+    "enabled": true,
+    "aggressive_mode": false,
+    "preserve_apps": [
+      "Microsoft.WindowsCalculator",
+      "Microsoft.WindowsCamera",
+      "Microsoft.ScreenSketch"
+    ]
+  },
+  "core_applications": [
+    "Google.Chrome",
+    "7zip.7zip",
+    "Adobe.Acrobat.Reader.64-bit",
+    "VideoLAN.VLC"
+  ],
+  "development_tools": [
+    "Microsoft.VisualStudioCode",
+    "Git.Git",
+    "Microsoft.WindowsTerminal",
+    "Docker.DockerDesktop",
+    "Python.Python.3.11",
+    "OpenJS.NodeJS",
+    "Postman.Postman"
+  ],
+  "developer_utilities": [
+    "Microsoft.PowerToys",
+    "JetBrains.Toolbox",
+    "Notepad++.Notepad++",
+    "WinSCP.WinSCP"
+  ],
+  "security_settings": {
+    "enable_windows_defender": true,
+    "disable_consumer_features": false,
+    "enable_developer_mode": true
+  }
+}
