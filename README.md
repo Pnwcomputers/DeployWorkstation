@@ -86,7 +86,7 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 - **📖 [Installation Guide](docs/INSTALLATION.md)** - Detailed setup instructions  
 - **⚙️ [Configuration Guide](docs/CONFIGURATION.md)** - Customize your deployment
 - **🔧 [Troubleshooting](docs/TROUBLESHOOTING.md)** - Solve common issues
-- **🧪 [Testing](Tests/)** - Run validation tests
+- **🧪 [Testing](tests/)** - Run validation tests
 - **📋 [Contributing](CONTRIBUTING.md)** - Help improve the project
 
 ## 🎪 Configuration Profiles
