@@ -64,4 +64,34 @@ Thank you for your interest in contributing to DeployWorkstation! This document 
 
 ## 🏷️ Commit Message Format
 
-Use conventional commits format:
+## Use conventional commits format:
+Examples:
+type(scope): description
+feat(installer): add support for custom MSI packages
+fix(logging): resolve log file permission issues
+docs(readme): update installation instructions
+test(core): add unit tests for bloatware removal
+
+## 🔒 Security Issues
+
+For security-related issues:
+1. **DO NOT** open a public issue
+2. Email security@pnwcomputers.com
+3. Include proof of concept (if safe)
+4. Allow reasonable time for response
+
+## 📞 Getting Help
+
+- Check existing issues and documentation
+- Join discussions in GitHub Discussions
+- Email support@pnwcomputers.com for questions
+
+## 🙏 Recognition
+
+Contributors will be recognized in:
+- CHANGELOG.md for significant contributions
+- README.md for major features
+- GitHub contributors page
+
+Thank you for helping make DeployWorkstation better!
+EOF
