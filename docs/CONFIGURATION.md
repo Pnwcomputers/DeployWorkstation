@@ -36,6 +36,6 @@ DeployWorkstation supports flexible configuration through JSON files that define
   "enable_firewall": true,
   "disable_autorun": true
 }
-  "network_settings": {}
+  "network_settings": {
 }
 
