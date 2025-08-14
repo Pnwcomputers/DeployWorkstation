@@ -1,0 +1,6 @@
+"bug":
+  - ".*(bug|error|fail|crash).*"
+"enhancement":
+  - ".*(feature|enhancement|improvement).*"
+"documentation":
+  - ".*(doc|readme|guide).*"
