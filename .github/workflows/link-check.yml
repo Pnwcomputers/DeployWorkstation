@@ -1,0 +1,20 @@
+name: Check Links in Docs
+on:
+  push:
+    paths:
+      - '**.md'
+  pull_request:
+    paths:
+      - '**.md'
+  schedule:
+    - cron: '0 3 * * 1' # Every Monday at 3am UTC
+
+jobs:
+  link-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Link Checker
+        uses: lycheeverse/lychee-action@v1
+        with:
+          args: --verbose --no-progress './**/*.md'
