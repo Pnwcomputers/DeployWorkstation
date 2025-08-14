@@ -36,7 +36,6 @@
     "disable_consumer_features": false,
     "enable_developer_mode": true
   ],
-  "deployment_profile": "developer",
   "development_tools": [
     "Microsoft.VisualStudioCode",
     "Git.Git",
