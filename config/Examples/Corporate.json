@@ -1,14 +1,46 @@
 {
   "deployment_profile": "corporate",
+  "description": "Standard corporate workstation deployment",
   "remove_bloatware": true,
   "install_core_apps": true,
+  "bloatware_removal": {
+    "enabled": true,
+    "aggressive_mode": true,
+    "preserve_apps": [
+      "Microsoft.WindowsCalculator",
+      "Microsoft.WindowsCamera"
+    ]
+  },
+  "core_applications": [
+    "Google.Chrome",
+    "7zip.7zip",
+    "Adobe.Acrobat.Reader.64-bit",
+    "VideoLAN.VLC",
+    "Malwarebytes.Malwarebytes"
+  ],
   "custom_applications": [
     "Microsoft.Teams",
     "Microsoft.Office",
     "Zoom.Zoom"
   ],
+  "business_applications": [
+    "Microsoft.Teams",
+    "Zoom.Zoom",
+    "Notepad++.Notepad++",
+    "Microsoft.PowerToys"
+  ],
   "disable_features": [
     "WindowsMediaPlayer",
     "XboxGaming"
-  ]
+  ],
+  "security_settings": {
+    "enable_windows_defender": true,
+    "disable_consumer_features": true,
+    "configure_update_settings": true
+  },
+  "network_settings": {
+    "disable_onedrive": true,
+    "configure_proxy": false,
+    "domain_join": false
+  }
 }
