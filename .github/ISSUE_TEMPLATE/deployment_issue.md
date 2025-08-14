@@ -1,4 +1,4 @@
-cat > .github/ISSUE_TEMPLATE/deployment_issue.md << 'EOF'
+
 ---
 name: Deployment Issue
 about: Report problems during workstation deployment
