@@ -80,8 +80,9 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 - 👤 Administrator Access
 - 💾 USB Drive or Network Share (Optional)
 
-- ## 🚀 Quick Links
+## 🚀 Quick Links
 
+- **🎯 [Quick Start](QuickStart.cmd)** - One-click deployment wizard
 - **📖 [Installation Guide](docs/INSTALLATION.md)** - Detailed setup instructions  
 - **⚙️ [Configuration Guide](docs/CONFIGURATION.md)** - Customize your deployment
 - **🔧 [Troubleshooting](docs/TROUBLESHOOTING.md)** - Solve common issues
