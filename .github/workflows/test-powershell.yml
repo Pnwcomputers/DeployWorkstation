@@ -1,0 +1,10 @@
+name: PowerShell Testing
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Test PowerShell Script
+      run: |
+        Invoke-Pester Tests/ -OutputFormat NUnitXml
