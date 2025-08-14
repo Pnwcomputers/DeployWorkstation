@@ -1,0 +1,14 @@
+{
+  "deployment_profile": "corporate",
+  "remove_bloatware": true,
+  "install_core_apps": true,
+  "custom_applications": [
+    "Microsoft.Teams",
+    "Microsoft.Office",
+    "Zoom.Zoom"
+  ],
+  "disable_features": [
+    "WindowsMediaPlayer",
+    "XboxGaming"
+  ]
+}
