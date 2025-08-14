@@ -80,6 +80,22 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 - 👤 Administrator Access
 - 💾 USB Drive or Network Share (Optional)
 
+- ## 🚀 Quick Links
+
+- **📖 [Installation Guide](docs/INSTALLATION.md)** - Detailed setup instructions  
+- **⚙️ [Configuration Guide](docs/CONFIGURATION.md)** - Customize your deployment
+- **🔧 [Troubleshooting](docs/TROUBLESHOOTING.md)** - Solve common issues
+- **🧪 [Testing](Tests/)** - Run validation tests
+- **📋 [Contributing](CONTRIBUTING.md)** - Help improve the project
+
+## 🎪 Configuration Profiles
+
+| Profile | Use Case | Applications | Configuration |
+|---------|----------|--------------|---------------|
+| **[Corporate](Config/Examples/Corporate.json)** | Business workstations | Office tools, security software | [Details](docs/CONFIGURATION.md#corporate) |
+| **[Developer](Config/Examples/Developer.json)** | Programming workstations | IDEs, development tools | [Details](docs/CONFIGURATION.md#developer) |
+| **[Home User](Config/Examples/HomeUser.json)** | Personal computers | Media, communication apps | [Details](docs/CONFIGURATION.md#home-user) |
+
 ### Quick Start
 
 1. **📥 Download the Repository**
