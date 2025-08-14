@@ -1,0 +1,36 @@
+{
+  "deployment_profile": "home_user",
+  "description": "Home user workstation with essential applications",
+  "bloatware_removal": {
+    "enabled": true,
+    "aggressive_mode": false,
+    "preserve_apps": [
+      "Microsoft.WindowsCalculator",
+      "Microsoft.WindowsCamera",
+      "Microsoft.Photos",
+      "Microsoft.Movies & TV"
+    ]
+  },
+  "core_applications": [
+    "Google.Chrome",
+    "7zip.7zip",
+    "Adobe.Acrobat.Reader.64-bit",
+    "VideoLAN.VLC"
+  ],
+  "home_applications": [
+    "Microsoft.Skype",
+    "Zoom.Zoom",
+    "Spotify.Spotify",
+    "Discord.Discord"
+  ],
+  "security_settings": {
+    "enable_windows_defender": true,
+    "disable_consumer_features": false,
+    "configure_family_safety": false
+  },
+  "privacy_settings": {
+    "disable_telemetry": true,
+    "disable_location_services": false,
+    "disable_advertising_id": true
+  }
+}
