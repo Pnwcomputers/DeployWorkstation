@@ -31,7 +31,7 @@
     "Notepad++.Notepad++",
     "WinSCP.WinSCP"
   ],
-  "security_settings": {
+  "security_settings": [
     "enable_windows_defender": true,
     "disable_consumer_features": false,
     "enable_developer_mode": true
