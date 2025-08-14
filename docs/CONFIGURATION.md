@@ -19,8 +19,7 @@ DeployWorkstation supports flexible configuration through JSON files that define
   ],
   "custom_removal": [
     "CustomApp.Name"
-  ]
-}
+  ],
   "core_applications": [
   "Google.Chrome",
   "7zip.7zip",
@@ -29,7 +28,7 @@ DeployWorkstation supports flexible configuration through JSON files that define
 "optional_applications": [
   "Microsoft.Teams",
   "Zoom.Zoom"
-]
+],
   "security_settings": {
   "enable_windows_defender": true,
   "disable_consumer_features": true,
