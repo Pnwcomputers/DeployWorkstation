@@ -1,4 +1,3 @@
-cat > .github/CONTRIBUTING.md << 'EOF'
 # Contributing to DeployWorkstation
 
 Thank you for your interest in contributing to DeployWorkstation! This document provides guidelines and information for contributors.
