@@ -1,0 +1,9 @@
+{
+  "deployment_profile": "developer",
+  "development_tools": [
+    "Microsoft.VisualStudioCode",
+    "Git.Git",
+    "Microsoft.WindowsTerminal",
+    "Docker.DockerDesktop"
+  ]
+}
