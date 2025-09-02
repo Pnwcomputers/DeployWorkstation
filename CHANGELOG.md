@@ -28,4 +28,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Network deployment server
 - Real-time progress dashboard
 - Multi-language support
-EOF
