@@ -161,3 +161,147 @@ Attempt 3: Final attempt with extended cleanup
 - **Execution**: Administrator privileges required
 - **Result**: Script completed successfully with registry settings properly applied
 
+# DeployWorkstation-AllUsers.ps1 - Version 2.2 Changes (9-12-2025)
+
+## Major Changes Summary
+
+### New Parameters Added
+- `$ExportWingetApps` - Export currently installed apps to apps.json
+- `$ImportWingetApps` - Import apps from apps.json 
+- `$SkipJavaRuntimes` - Skip Java runtime installations
+
+### Application Installation Overhaul
+
+**Old Version:**
+- 9 basic applications including minimal .NET and VC++ runtimes
+- Single Java Runtime Environment
+
+**New Version:**
+- **Core Apps**: Same 7 applications (Malwarebytes, Chrome, etc.)
+- **Comprehensive .NET**: Framework 4.8.1, Desktop Runtime 8 & 9
+- **Complete VC++ Redistributables**: All versions from 2005-2015+ (x64 & x86)
+- **Full Java Support**: JRE + JDK for versions 8, 11, 17, 21 (Eclipse Temurin)
+- **Total**: ~25 runtime packages vs. original 9
+
+### Enhanced Error Handling & Logging
+
+**Improvements:**
+- Comprehensive try-catch blocks throughout all functions
+- Better parameter validation with `[Parameter(Mandatory=$true)]`
+- Enhanced logging with severity levels (INFO, WARN, ERROR, DEBUG)
+- Proper return value checking in main execution flow
+- Input validation for all critical functions
+
+### Code Structure Improvements
+
+**Major Changes:**
+- **Fixed Duplicate Functions** - Removed duplicate `Initialize-WingetSources` and `Export-WingetApps` definitions
+- **Main() Function** - Created proper main execution function with return value checking
+- **Consistent Return Values** - All functions now return boolean success/failure indicators
+- **Better Variable Scoping** - Improved variable management and cleanup
+
+### Safety & Security Enhancements
+
+**Key Changes:**
+- **Telemetry Setting**: Changed from `0` to `1` (basic level needed for security updates)
+- **Conservative Service Disabling**: Removed potentially problematic services from disable list
+- **Better Registry Validation**: Enhanced checks before registry operations
+- **Improved McAfee Removal**: Better process handling and validation
+
+### Performance & Reliability
+
+**Enhancements:**
+- Better winget package validation with regex escaping
+- Installation throttling (500ms delays between apps)
+- 80% success threshold instead of requiring 100%
+- Enhanced registry hive mounting/unmounting with retry logic
+- More robust cleanup procedures
+
+## Detailed Function Changes
+
+### Install-StandardApps Function
+
+```powershell
+# OLD: 9 total packages
+$appsToInstall = @(
+    # Basic apps + minimal runtimes
+)
+
+# NEW: 25+ comprehensive runtime packages organized by category
+$coreApps = @(...)          # 7 apps
+$dotnetApps = @(...)        # 3 .NET packages  
+$vcredistApps = @(...)      # 12 VC++ packages
+$javaJREApps = @(...)       # 4 JRE packages
+$javaJDKApps = @(...)       # 4 JDK packages
+```
+
+### System Configuration
+- **Improved Telemetry Handling**: Set to basic level (1) instead of completely disabled (0)
+- **Enhanced Service Management**: More conservative approach to service disabling
+- **Better Registry Operations**: Added proper path validation and error handling
+
+### Winget Management
+- **Export/Import Functions**: New functionality for app management
+- **Better Source Management**: Enhanced winget source initialization
+- **Improved Package Detection**: Better existing package checking
+
+## New Features
+
+1. **App Export/Import**: Backup and restore winget app lists
+2. **Flexible Java Installation**: Option to skip Java runtimes entirely
+3. **Comprehensive Runtime Coverage**: Support for legacy applications requiring older runtimes
+4. **Enhanced Logging**: Detailed installation summaries by category
+5. **Graceful Degradation**: 80% success rate acceptance for more realistic deployment
+
+## Critical Bug Fixes
+
+1. **Duplicate Function Definitions** - Would have caused PowerShell execution errors
+2. **Duplicate Function Calls** - `Set-DefaultUserProfile` was called twice
+3. **Inconsistent Error Handling** - Now uniform across all functions
+4. **Registry Cleanup Issues** - Enhanced dismounting with retry logic
+
+## Complete Runtime Library Coverage
+
+### .NET Frameworks & Runtimes
+- .NET Framework 4.8.1
+- .NET Desktop Runtime 8 (includes x64)
+- .NET Desktop Runtime 9 (includes x64)
+
+### Visual C++ Redistributables (Complete Set)
+- **2015+** (Latest): x64, x86
+- **2013**: x64, x86  
+- **2012**: x64, x86
+- **2010**: x64, x86
+- **2008**: x64, x86
+- **2005**: x64, x86
+
+### Java Runtime & Development Kits
+- **JRE (Runtime)**: Versions 8, 11, 17, 21
+- **JDK (Development)**: Versions 8, 11, 17, 21
+
+### Core Applications
+- VLC Media Player
+- 7-Zip
+- Malwarebytes
+- Google Chrome
+- Adobe Reader
+- Zoom
+- BleachBit
+
+## Installation Summary Example
+
+The new version provides detailed logging:
+
+```
+Installation Summary:
+- Core Applications: 7 packages
+- .NET Frameworks/Runtimes: 3 packages  
+- Visual C++ Redistributables: 12 packages
+- Java JRE Packages: 4 packages
+- Java JDK Packages: 4 packages
+```
+
+## Impact
+
+This represents a significant upgrade from a basic workstation setup script to a comprehensive enterprise-grade deployment tool with extensive runtime library support and robust error handling. The script now ensures maximum application compatibility while maintaining system stability and providing detailed feedback throughout the deployment process.
+
