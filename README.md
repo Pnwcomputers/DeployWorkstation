@@ -4,46 +4,98 @@ DeployWorkstation is a PowerShell-based, zero-touch provisioning toolkit for Win
 Whether you're imaging bare metal or cleaning up an existing PC, DeployWorkstation handles the heavy lifting of bloatware removal and comprehensive application/runtime installations.
 DeployWorkstation turns what used to be a 30-60 minute manual process into a single "plug-and-play" operation, saving you valuable time on every workstation you configure. Feel free to fork, tweak the app list/script, and contribute back!  
 
-## Features
+---
 
-- Removes bloatware and unwanted apps for all users
-- Installs standard applications (Malwarebytes, Chrome, etc.) in parallel
-- Applies system-wide privacy and telemetry settings
-- Supports dry-run mode for safe simulation
-- Structured logging and summary reports
-- Registry backup before changes
-- Winget export/import for app lists
-- Enhanced error handling and retry logic
+# 🛠️ Deployment Features Summary
 
-- **Self-elevating & policy-bypassing**  
-  Automatically relaunches under Windows PowerShell 5.1 with `-ExecutionPolicy Bypass` and UAC elevation, so you can double-click or run a single .cmd wrapper without tweaking system settings.
+A structured overview of key capabilities for system setup and optimization.
 
-- **UWP "bloatware" purge**  
-  In one Desktop-PowerShell pass it uninstalls and de-provisions built-in apps like New Outlook, Clipchamp, Family Safety, OneDrive, LinkedIn, Copilot, Teams, Skype, Xbox, and more.
+## 📦 Bloatware Removal
+Removes unwanted apps for all users, including UWP apps like:
+- New Outlook
+- Clipchamp
+- Family Safety
+- OneDrive
+- LinkedIn
+- Copilot
+- Teams
+- Skype
+- Xbox
 
-- **Win32/MSI removal & DISM cleanup**  
-  Removes legacy features (Quick Assist, Remote Desktop, Mixed Reality, Game Bar, etc.) via WinGet, DISM and registry, and uninstalls enterprise software such as McAfee by parsing their UninstallStrings from the registry.
+## 🚀 Standard App Installation
+Installs essential third-party tools in parallel using **WinGet**:
+- Malwarebytes
+- Chrome
+- BleachBit
+- Adobe Reader
+- Zoom
+- 7-Zip
+- VLC  
+Includes silent-install flags and built-in error logging.
 
-- **Comprehensive runtime library installation**  
-  Installs complete runtime coverage including .NET Framework/Desktop Runtimes, Visual C++ Redistributables (2005-2015+), and Java JRE/JDK packages to ensure maximum application compatibility.
+## 🔒 Privacy Settings
+Applies system-wide privacy and telemetry configurations.
 
-- **Standard app install via WinGet**  
-  Installs your golden image of third-party tools (Malwarebytes, BleachBit, Chrome, Adobe Reader, Zoom, 7-Zip, VLC, etc.) with silent-install flags and built-in error logging.
+## 🧪 Dry-Run Mode
+Supports safe simulation of deployment steps before execution.
 
-- **Enhanced error handling & logging**  
-  Comprehensive try-catch blocks, return value validation, and detailed logging with severity levels (INFO, WARN, ERROR, DEBUG) for better troubleshooting.
+## 📋 Logging and Reports
+Structured logging with severity levels:
+- INFO
+- WARN
+- ERROR
+- DEBUG  
+Includes summary reports for troubleshooting.
 
-- **Flexible deployment options**  
-  New parameters for app export/import, selective Java installation, and granular control over deployment phases.
+## 🧾 Registry Backup
+Backs up registry before making any changes.
 
-- **Centralized logging & graceful degradation**  
-  Writes a detailed `DeployWorkstation-AllUsers.log` in its script folder and accepts 80% success rate for realistic deployment scenarios.
+## 📤 Winget Export/Import
+Supports export and import of application lists via Winget.
+
+## ⚠️ Enhanced Error Handling
+Robust error handling with:
+- Retry logic
+- Try-catch blocks
+- Return value validation
+
+## 🔐 Self-Elevation
+Automatically relaunches under **PowerShell 5.1** with:
+- `-ExecutionPolicy Bypass`
+- UAC elevation  
+No need to tweak system settings manually.
+
+## 🧹 Win32/MSI Removal
+Removes legacy features and enterprise software using:
+- WinGet
+- DISM
+- Registry parsing of `UninstallStrings`  
+Targets items like Quick Assist, Remote Desktop, Mixed Reality, Game Bar, McAfee, etc.
+
+## 📦 Runtime Library Installation
+Installs complete runtime coverage:
+- .NET Framework/Desktop Runtimes
+- Visual C++ Redistributables (2005–2015+)
+- Java JRE/JDK
+
+## ⚙️ Flexible Deployment
+Offers granular control with parameters for:
+- App export/import
+- Selective Java installation
+- Phase-based deployment
+
+## 📁 Centralized Logging
+Writes to `DeployWorkstation-AllUsers.log` and tolerates up to **80% success rate** for realistic deployment scenarios.
+
+---
 
 ## Usage
 1. **Copy** the `DeployWorkstation-AllUsers.ps1` and its `.cmd` launcher onto your USB or network share.  
 2. **Double-click** the `.cmd` (or run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\DeployWorkstation-AllUsers.ps1`) to start.  
 3. **Let it run** unattended!
 4. When it finishes, it will pause for review and display completion status.
+
+---
 
 ### Command Line Parameters
 
