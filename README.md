@@ -4,7 +4,7 @@ DeployWorkstation is a PowerShell-based, zero-touch provisioning toolkit for Win
 Whether you're imaging bare metal or cleaning up an existing PC, DeployWorkstation handles the heavy lifting of bloatware removal and comprehensive application/runtime installations.
 DeployWorkstation turns what used to be a 30-60 minute manual process into a single "plug-and-play" operation, saving you valuable time on every workstation you configure. Feel free to fork, tweak the app list/script, and contribute back!  
 
-- ## Features
+## Features
 
 - Removes bloatware and unwanted apps for all users
 - Installs standard applications (Malwarebytes, Chrome, etc.) in parallel
