@@ -437,4 +437,4 @@ To restore removed functionality:
 ---
 
 **Last Updated**: September 2025  
-**Script Version**: 2.2
+**Script Version**: 3.0
