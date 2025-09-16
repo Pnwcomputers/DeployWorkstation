@@ -1,8 +1,19 @@
-# DeployWorkstation v2.2 (Comprehensive Runtime Support)
+# DeployWorkstation v3 *MAJOR Overhaul
 
 DeployWorkstation is a PowerShell-based, zero-touch provisioning toolkit for Windows 10 & 11 workstations. 
 Whether you're imaging bare metal or cleaning up an existing PC, DeployWorkstation handles the heavy lifting of bloatware removal and comprehensive application/runtime installations.
 DeployWorkstation turns what used to be a 30-60 minute manual process into a single "plug-and-play" operation, saving you valuable time on every workstation you configure. Feel free to fork, tweak the app list/script, and contribute back!  
+
+- ## Features
+
+- Removes bloatware and unwanted apps for all users
+- Installs standard applications (Malwarebytes, Chrome, etc.) in parallel
+- Applies system-wide privacy and telemetry settings
+- Supports dry-run mode for safe simulation
+- Structured logging and summary reports
+- Registry backup before changes
+- Winget export/import for app lists
+- Enhanced error handling and retry logic
 
 - **Self-elevating & policy-bypassing**  
   Automatically relaunches under Windows PowerShell 5.1 with `-ExecutionPolicy Bypass` and UAC elevation, so you can double-click or run a single .cmd wrapper without tweaking system settings.
