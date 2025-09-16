@@ -1,5 +1,5 @@
 # DeployWorkstation.ps1 - Changelog
-## DeployWorkstation-AllUsers.ps1 - Version 3.0 - 09-15-2025
+## DeployWorkstation-AllUsers.ps1 - Version 3.0 - (9-15-2025)
 
 ### Added
 - Dry-run mode for safe simulation of all actions.
@@ -175,7 +175,7 @@ Installation Summary:
 This represents a significant upgrade from a basic workstation setup script to a comprehensive enterprise-grade deployment tool with extensive runtime library support and robust error handling. The script now ensures maximum application compatibility while maintaining system stability and providing detailed feedback throughout the deployment process.
 
 
-## Version 2.1.1 - Bug Fixes (2025-06-23)
+## Version 2.1.1 - Bug Fixes (06-23-2025)
 
 ### 🐛 **Critical Bug Fixes**
 
