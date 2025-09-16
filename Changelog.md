@@ -30,7 +30,7 @@
 - None.
 
 
-# DeployWorkstation-AllUsers.ps1 - Version 2.2 Changes (9-12-2025)
+## DeployWorkstation-AllUsers.ps1 - Version 2.2 Changes (9-12-2025)
 
 ## Major Changes Summary
 
