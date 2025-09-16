@@ -1,4 +1,33 @@
 # DeployWorkstation.ps1 - Changelog
+## [DeployWorkstation-AllUsers.ps1 - Version 3.0] - 2025-09-15
+
+### Added
+- Dry-run mode for safe simulation of all actions.
+- Structured logging with component and error code details.
+- Retry logic for critical operations (winget, registry, etc.).
+- Parallel installation of standard apps for improved speed.
+- Removal of Windows optional features (capabilities).
+- Registry backup before modification.
+- Comprehensive summary report at end of execution.
+- Winget export/import support for app lists.
+- Enhanced privacy, telemetry, and advertising settings.
+- Improved configuration for all user profiles (existing and future).
+
+### Changed
+- Expanded parameter validation and help messages.
+- Improved error handling and emergency cleanup.
+- More robust bloatware removal for all users.
+- Enhanced admin check and prerequisite validation.
+
+### Fixed
+- Better handling of registry and service operations.
+- Improved compatibility with Windows 10/11.
+
+### Deprecated
+- None.
+
+### Removed
+- None.
 
 ## Version 2.1.1 - Bug Fixes (2025-06-23)
 
@@ -305,34 +334,6 @@ Installation Summary:
 
 This represents a significant upgrade from a basic workstation setup script to a comprehensive enterprise-grade deployment tool with extensive runtime library support and robust error handling. The script now ensures maximum application compatibility while maintaining system stability and providing detailed feedback throughout the deployment process.
 
-## [DeployWorkstation-AllUsers.ps1 - Version 3.0] - 2025-09-15
 
-### Added
-- Dry-run mode for safe simulation of all actions.
-- Structured logging with component and error code details.
-- Retry logic for critical operations (winget, registry, etc.).
-- Parallel installation of standard apps for improved speed.
-- Removal of Windows optional features (capabilities).
-- Registry backup before modification.
-- Comprehensive summary report at end of execution.
-- Winget export/import support for app lists.
-- Enhanced privacy, telemetry, and advertising settings.
-- Improved configuration for all user profiles (existing and future).
-
-### Changed
-- Expanded parameter validation and help messages.
-- Improved error handling and emergency cleanup.
-- More robust bloatware removal for all users.
-- Enhanced admin check and prerequisite validation.
-
-### Fixed
-- Better handling of registry and service operations.
-- Improved compatibility with Windows 10/11.
-
-### Deprecated
-- None.
-
-### Removed
-- None.
 
 
