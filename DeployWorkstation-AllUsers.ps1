@@ -135,142 +135,6 @@ $Script:ActionsSummary = @{
 }
 
 # ================================
-# Enhanced Configuration Management
-# ================================
-
-class DeploymentConfig {
-    [hashtable]$Applications = @{}
-    [string[]]$BloatwarePatterns = @()
-    [hashtable]$RegistrySettings = @{}
-    [string[]]$ServicesToDisable = @()
-    [string[]]$CapabilitiesToRemove = @()
-    [hashtable]$SystemRequirements = @{}
-    
-    DeploymentConfig() {
-        $this.LoadDefaults()
-    }
-    
-    [void]LoadDefaults() {
-        # Default configuration
-        $this.SystemRequirements = @{
-            MinWindowsVersion = '10.0.0.0'
-            RequiredCommands = @('reg', 'winget', 'powershell')
-            MinFreeDiskSpaceGB = 10
-            MinMemoryGB = 4
-        }
-        
-        $this.Applications = @{
-            Core = @(
-                @{ Id = 'Malwarebytes.Malwarebytes'; Name = 'Malwarebytes'; Category = 'Security' }
-                @{ Id = 'BleachBit.BleachBit'; Name = 'BleachBit'; Category = 'Utilities' }
-                @{ Id = 'Google.Chrome'; Name = 'Google Chrome'; Category = 'Browser' }
-                @{ Id = 'Adobe.Acrobat.Reader.64-bit'; Name = 'Adobe Reader'; Category = 'Productivity' }
-                @{ Id = '7zip.7zip'; Name = '7-Zip'; Category = 'Utilities' }
-                @{ Id = 'VideoLAN.VLC'; Name = 'VLC Media Player'; Category = 'Media' }
-            )
-            
-            DotNet = @(
-                @{ Id = 'Microsoft.DotNet.Framework.4.8.1'; Name = '.NET Framework 4.8.1' }
-                @{ Id = 'Microsoft.DotNet.DesktopRuntime.8'; Name = '.NET Desktop Runtime 8' }
-                @{ Id = 'Microsoft.DotNet.DesktopRuntime.9'; Name = '.NET Desktop Runtime 9' }
-            )
-            
-            VCRedist = @(
-                @{ Id = 'Microsoft.VCRedist.2015+.x64'; Name = 'VC Redist x64 2015+' }
-                @{ Id = 'Microsoft.VCRedist.2015+.x86'; Name = 'VC Redist x86 2015+' }
-                @{ Id = 'Microsoft.VCRedist.2013.x64'; Name = 'VC Redist x64 2013' }
-                @{ Id = 'Microsoft.VCRedist.2013.x86'; Name = 'VC Redist x86 2013' }
-            )
-            
-            Java = @(
-                @{ Id = 'Oracle.JavaRuntimeEnvironment'; Name = 'Java Runtime Environment' }
-            )
-        }
-        
-        $this.BloatwarePatterns = @(
-            'CoPilot', 'Outlook', 'Quick Assist', 'Remote Desktop',
-            'Mixed Reality Portal', 'Clipchamp', 'Xbox', 'Family',
-            'Skype', 'LinkedIn', 'OneDrive', 'Teams', 'Disney',
-            'Netflix', 'Spotify', 'TikTok', 'Instagram', 'Facebook',
-            'Candy', 'Twitter', 'Minecraft'
-        )
-        
-        $this.ServicesToDisable = @(
-            'DiagTrack', 'dmwappushservice', 'lfsvc', 'MapsBroker',
-            'NetTcpPortSharing', 'RemoteAccess', 'RemoteRegistry',
-            'SharedAccess', 'TrkWks', 'WbioSrvc', 'WMPNetworkSvc',
-            'XblAuthManager', 'XblGameSave', 'XboxNetApiSvc'
-        )
-        
-        $this.CapabilitiesToRemove = @(
-            'App.Support.QuickAssist~~~~0.0.1.0',
-            'App.Xbox.TCUI~~~~0.0.1.0',
-            'App.XboxGameOverlay~~~~0.0.1.0',
-            'Browser.InternetExplorer~~~~0.0.11.0'
-        )
-    }
-    
-    [void]LoadFromFile([string]$FilePath) {
-        try {
-            $json = Get-Content $FilePath -Raw | ConvertFrom-Json
-            
-            if ($json.Applications) {
-                $this.Applications = @{}
-                foreach ($category in $json.Applications.PSObject.Properties) {
-                    $this.Applications[$category.Name] = $category.Value
-                }
-            }
-            
-            if ($json.BloatwarePatterns) {
-                $this.BloatwarePatterns = $json.BloatwarePatterns
-            }
-            
-            if ($json.ServicesToDisable) {
-                $this.ServicesToDisable = $json.ServicesToDisable
-            }
-            
-            if ($json.CapabilitiesToRemove) {
-                $this.CapabilitiesToRemove = $json.CapabilitiesToRemove
-            }
-            
-            if ($json.SystemRequirements) {
-                foreach ($prop in $json.SystemRequirements.PSObject.Properties) {
-                    $this.SystemRequirements[$prop.Name] = $prop.Value
-                }
-            }
-        }
-        catch {
-            throw "Failed to load configuration from $FilePath : $_"
-        }
-    }
-    
-    [void]SaveToFile([string]$FilePath) {
-        $export = @{
-            Applications = $this.Applications
-            BloatwarePatterns = $this.BloatwarePatterns
-            ServicesToDisable = $this.ServicesToDisable
-            CapabilitiesToRemove = $this.CapabilitiesToRemove
-            SystemRequirements = $this.SystemRequirements
-        }
-        
-        $export | ConvertTo-Json -Depth 10 | Set-Content $FilePath -Encoding UTF8
-    }
-}
-
-# Initialize configuration
-$Script:Config = [DeploymentConfig]::new()
-if ($ConfigFile) {
-    try {
-        Write-Host "Loading configuration from: $ConfigFile" -ForegroundColor Yellow
-        $Script:Config.LoadFromFile($ConfigFile)
-    }
-    catch {
-        Write-Host "Failed to load config file: $_" -ForegroundColor Red
-        exit 1
-    }
-}
-
-# ================================
 # Enhanced Logging System
 # ================================
 
@@ -315,17 +179,21 @@ function Write-Log {
     
     # Track errors and warnings
     switch ($Level) {
-        'ERROR' { $Script:ActionsSummary.Errors += "$Component : $Message" }
-        'WARN' { $Script:ActionsSummary.Warnings += "$Component : $Message" }
+        'ERROR' { 
+            $Script:ActionsSummary.Errors += "${Component}: ${Message}"
+        }
+        'WARN' { 
+            $Script:ActionsSummary.Warnings += "${Component}: ${Message}"
+        }
         'CRITICAL' { 
-            $Script:ActionsSummary.Errors += "[CRITICAL] $Component : $Message"
+            $Script:ActionsSummary.Errors += "[CRITICAL] ${Component}: ${Message}"
             $Script:CriticalErrorOccurred = $true
         }
     }
     
     # Console output with enhanced formatting
     $prefix = if ($DryRun) { "[DRY-RUN] " } else { "" }
-    $consoleMessage = "$prefix[$timestamp] [$Level] [$Component] $Message"
+    $consoleMessage = "${prefix}[${timestamp}] [${Level}] [${Component}] ${Message}"
     
     switch ($Level) {
         'CRITICAL' { Write-Host $consoleMessage -ForegroundColor Magenta }
@@ -339,6 +207,100 @@ function Write-Log {
         default { Write-Host $consoleMessage }
     }
 }
+
+# ================================
+# Configuration Management
+# ================================
+
+function Get-DefaultConfiguration {
+    return @{
+        SystemRequirements = @{
+            MinWindowsVersion = '10.0.0.0'
+            RequiredCommands = @('reg', 'winget', 'powershell')
+            MinFreeDiskSpaceGB = 10
+            MinMemoryGB = 4
+        }
+        
+        Applications = @{
+            Core = @(
+                @{ Id = 'Malwarebytes.Malwarebytes'; Name = 'Malwarebytes'; Category = 'Security' }
+                @{ Id = 'BleachBit.BleachBit'; Name = 'BleachBit'; Category = 'Utilities' }
+                @{ Id = 'Google.Chrome'; Name = 'Google Chrome'; Category = 'Browser' }
+                @{ Id = 'Adobe.Acrobat.Reader.64-bit'; Name = 'Adobe Reader'; Category = 'Productivity' }
+                @{ Id = '7zip.7zip'; Name = '7-Zip'; Category = 'Utilities' }
+                @{ Id = 'VideoLAN.VLC'; Name = 'VLC Media Player'; Category = 'Media' }
+            )
+            
+            DotNet = @(
+                @{ Id = 'Microsoft.DotNet.Framework.4.8.1'; Name = '.NET Framework 4.8.1' }
+                @{ Id = 'Microsoft.DotNet.DesktopRuntime.8'; Name = '.NET Desktop Runtime 8' }
+                @{ Id = 'Microsoft.DotNet.DesktopRuntime.9'; Name = '.NET Desktop Runtime 9' }
+            )
+            
+            VCRedist = @(
+                @{ Id = 'Microsoft.VCRedist.2015+.x64'; Name = 'VC Redist x64 2015+' }
+                @{ Id = 'Microsoft.VCRedist.2015+.x86'; Name = 'VC Redist x86 2015+' }
+                @{ Id = 'Microsoft.VCRedist.2013.x64'; Name = 'VC Redist x64 2013' }
+                @{ Id = 'Microsoft.VCRedist.2013.x86'; Name = 'VC Redist x86 2013' }
+            )
+            
+            Java = @(
+                @{ Id = 'Oracle.JavaRuntimeEnvironment'; Name = 'Java Runtime Environment' }
+            )
+        }
+        
+        BloatwarePatterns = @(
+            'CoPilot', 'Outlook', 'Quick Assist', 'Remote Desktop',
+            'Mixed Reality Portal', 'Clipchamp', 'Xbox', 'Family',
+            'Skype', 'LinkedIn', 'OneDrive', 'Teams', 'Disney',
+            'Netflix', 'Spotify', 'TikTok', 'Instagram', 'Facebook',
+            'Candy', 'Twitter', 'Minecraft'
+        )
+        
+        ServicesToDisable = @(
+            'DiagTrack', 'dmwappushservice', 'lfsvc', 'MapsBroker',
+            'NetTcpPortSharing', 'RemoteAccess', 'RemoteRegistry',
+            'SharedAccess', 'TrkWks', 'WbioSrvc', 'WMPNetworkSvc',
+            'XblAuthManager', 'XblGameSave', 'XboxNetApiSvc'
+        )
+        
+        CapabilitiesToRemove = @(
+            'App.Support.QuickAssist~~~~0.0.1.0',
+            'App.Xbox.TCUI~~~~0.0.1.0',
+            'App.XboxGameOverlay~~~~0.0.1.0',
+            'Browser.InternetExplorer~~~~0.0.11.0'
+        )
+    }
+}
+
+function Load-Configuration {
+    param([string]$ConfigFile)
+    
+    $config = Get-DefaultConfiguration
+    
+    if ($ConfigFile -and (Test-Path $ConfigFile)) {
+        try {
+            Write-Log "Loading configuration from: $ConfigFile" -Component 'CONFIG'
+            $jsonConfig = Get-Content $ConfigFile -Raw | ConvertFrom-Json
+            
+            # Merge with defaults
+            foreach ($property in $jsonConfig.PSObject.Properties) {
+                $config[$property.Name] = $property.Value
+            }
+            
+            Write-Log "Configuration loaded successfully" -Component 'CONFIG'
+        }
+        catch {
+            Write-Log "Failed to load configuration file: $_" -Level 'ERROR' -Component 'CONFIG'
+            throw
+        }
+    }
+    
+    return $config
+}
+
+# Load configuration
+$Script:Config = Load-Configuration -ConfigFile $ConfigFile
 
 # ================================
 # Pre-Flight Checks System
@@ -388,7 +350,8 @@ function Test-SystemRequirements {
         Write-Log "All required commands available" -Component 'PREFLIGHT'
     }
     else {
-        Write-Log "Missing required commands: $($missingCommands -join ', ')" -Level 'ERROR' -Component 'PREFLIGHT'
+        $cmdList = $missingCommands -join ', '
+        Write-Log "Missing required commands: $cmdList" -Level 'ERROR' -Component 'PREFLIGHT'
     }
     
     # Check disk space
@@ -430,7 +393,8 @@ function Test-SystemRequirements {
     }
     
     # Check admin rights
-    $checks.AdminRights = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")
+    $checks.AdminRights = $isAdmin
     
     if ($checks.AdminRights) {
         Write-Log "Administrator rights confirmed" -Component 'PREFLIGHT'
@@ -441,7 +405,8 @@ function Test-SystemRequirements {
     
     # Check registry access
     try {
-        $testPath = "HKLM:\SOFTWARE\DeploymentTest_$(Get-Random)"
+        $randomNum = Get-Random
+        $testPath = "HKLM:\SOFTWARE\DeploymentTest_$randomNum"
         New-Item -Path $testPath -Force | Out-Null
         Remove-Item -Path $testPath -Force
         $checks.RegistryAccess = $true
@@ -502,31 +467,6 @@ function Test-SystemRequirements {
 # Rollback System
 # ================================
 
-class RollbackAction {
-    [string]$Type
-    [string]$Description
-    [scriptblock]$UndoAction
-    [hashtable]$Context
-    
-    RollbackAction([string]$type, [string]$desc, [scriptblock]$undo, [hashtable]$ctx) {
-        $this.Type = $type
-        $this.Description = $desc
-        $this.UndoAction = $undo
-        $this.Context = $ctx
-    }
-    
-    [bool]Execute() {
-        try {
-            & $this.UndoAction
-            return $true
-        }
-        catch {
-            Write-Log "Rollback failed for: $($this.Description) - $_" -Level 'ERROR' -Component 'ROLLBACK'
-            return $false
-        }
-    }
-}
-
 function Register-RollbackAction {
     param(
         [string]$Type,
@@ -537,7 +477,13 @@ function Register-RollbackAction {
     
     if (-not $EnableRollback) { return }
     
-    $action = [RollbackAction]::new($Type, $Description, $UndoAction, $Context)
+    $action = @{
+        Type = $Type
+        Description = $Description
+        UndoAction = $UndoAction
+        Context = $Context
+    }
+    
     $Script:RollbackStack += $action
     
     Write-Log "Registered rollback action: $Description" -Level 'DEBUG' -Component 'ROLLBACK'
@@ -563,13 +509,15 @@ function Invoke-Rollback {
         $action = $Script:RollbackStack[$i]
         Write-Log "Executing rollback: $($action.Description)" -Component 'ROLLBACK'
         
-        if ($action.Execute()) {
+        try {
+            & $action.UndoAction
             $successCount++
             $Script:ActionsSummary.RollbacksPerformed += $action.Description
-            Write-Host "  ✓ Rolled back: $($action.Description)" -ForegroundColor Green
+            Write-Host "  Rolled back: $($action.Description)" -ForegroundColor Green
         }
-        else {
-            Write-Host "  ✗ Failed to rollback: $($action.Description)" -ForegroundColor Red
+        catch {
+            Write-Host "  Failed to rollback: $($action.Description)" -ForegroundColor Red
+            Write-Log "Rollback failed: $_" -Level 'ERROR' -Component 'ROLLBACK'
         }
     }
     
@@ -578,7 +526,55 @@ function Invoke-Rollback {
 }
 
 # ================================
-# Enhanced Registry Management with Cleanup
+# Resource Cleanup Management
+# ================================
+
+function Register-ResourceCleanup {
+    param(
+        [string]$Type,
+        [string]$Name,
+        [scriptblock]$CleanupAction,
+        [int]$Priority = 50
+    )
+    
+    $cleanup = @{
+        Type = $Type
+        Name = $Name
+        CleanupAction = $CleanupAction
+        Priority = $Priority
+    }
+    
+    $Script:ResourceCleanupStack += $cleanup
+    
+    Write-Log "Registered cleanup for: $Type - $Name" -Level 'DEBUG' -Component 'CLEANUP'
+}
+
+function Invoke-ResourceCleanup {
+    if ($Script:ResourceCleanupStack.Count -eq 0) {
+        Write-Log "No resources to clean up" -Component 'CLEANUP'
+        return
+    }
+    
+    Write-Log "Starting resource cleanup..." -Component 'CLEANUP'
+    
+    # Sort by priority (higher numbers first)
+    $sortedCleanup = $Script:ResourceCleanupStack | Sort-Object -Property Priority -Descending
+    
+    foreach ($cleanup in $sortedCleanup) {
+        try {
+            Write-Log "Cleaning up: $($cleanup.Type) - $($cleanup.Name)" -Component 'CLEANUP'
+            & $cleanup.CleanupAction
+        }
+        catch {
+            Write-Log "Cleanup failed for $($cleanup.Name): $_" -Level 'WARN' -Component 'CLEANUP'
+        }
+    }
+    
+    Write-Log "Resource cleanup completed" -Component 'CLEANUP'
+}
+
+# ================================
+# Enhanced Registry Management
 # ================================
 
 function Test-RegistryDrive {
@@ -635,70 +631,14 @@ function Initialize-RegistryDrives {
 }
 
 # ================================
-# Resource Cleanup Management
-# ================================
-
-class ResourceCleanup {
-    [string]$Type
-    [string]$Name
-    [scriptblock]$CleanupAction
-    [int]$Priority
-    
-    ResourceCleanup([string]$type, [string]$name, [scriptblock]$cleanup, [int]$priority) {
-        $this.Type = $type
-        $this.Name = $name
-        $this.CleanupAction = $cleanup
-        $this.Priority = $priority
-    }
-}
-
-function Register-ResourceCleanup {
-    param(
-        [string]$Type,
-        [string]$Name,
-        [scriptblock]$CleanupAction,
-        [int]$Priority = 50
-    )
-    
-    $cleanup = [ResourceCleanup]::new($Type, $Name, $CleanupAction, $Priority)
-    $Script:ResourceCleanupStack += $cleanup
-    
-    Write-Log "Registered cleanup for: $Type - $Name" -Level 'DEBUG' -Component 'CLEANUP'
-}
-
-function Invoke-ResourceCleanup {
-    if ($Script:ResourceCleanupStack.Count -eq 0) {
-        Write-Log "No resources to clean up" -Component 'CLEANUP'
-        return
-    }
-    
-    Write-Log "Starting resource cleanup..." -Component 'CLEANUP'
-    
-    # Sort by priority (higher numbers first)
-    $sortedCleanup = $Script:ResourceCleanupStack | Sort-Object -Property Priority -Descending
-    
-    foreach ($cleanup in $sortedCleanup) {
-        try {
-            Write-Log "Cleaning up: $($cleanup.Type) - $($cleanup.Name)" -Component 'CLEANUP'
-            & $cleanup.CleanupAction
-        }
-        catch {
-            Write-Log "Cleanup failed for $($cleanup.Name): $_" -Level 'WARN' -Component 'CLEANUP'
-        }
-    }
-    
-    Write-Log "Resource cleanup completed" -Component 'CLEANUP'
-}
-
-# ================================
-# Enhanced Winget Operations (Sequential with Retry)
+# Enhanced Winget Operations
 # ================================
 
 function Invoke-WingetInstall {
     param(
         [Parameter(Mandatory=$true)]
         [hashtable]$App,
-        [int]$MaxRetries = $Script:MaxRetries,
+        [int]$MaxRetries = 3,
         [int]$RetryDelay = 5
     )
     
@@ -738,9 +678,12 @@ function Invoke-WingetInstall {
                 $Script:ActionsSummary.AppsInstalled += $App.Name
                 
                 # Register rollback action
-                Register-RollbackAction -Type 'AppInstall' -Description "Uninstall $($App.Name)" -UndoAction {
-                    winget uninstall --id $App.Id --silent --force 2>$null
-                }.GetNewClosure()
+                if ($EnableRollback) {
+                    $appId = $App.Id
+                    Register-RollbackAction -Type 'AppInstall' -Description "Uninstall $($App.Name)" -UndoAction {
+                        winget uninstall --id $appId --silent --force 2>$null
+                    }
+                }
             }
             else {
                 $lastError = "Exit code: $($process.ExitCode)"
@@ -783,7 +726,8 @@ function Install-ApplicationsSequentially {
         
         Write-Host "`rProgress: [$progress%] Installing $($i + 1)/$totalApps - $($app.Name)..." -NoNewline
         
-        if (Invoke-WingetInstall -App $app) {
+        $result = Invoke-WingetInstall -App $app -MaxRetries $Script:MaxRetries
+        if ($result) {
             $successCount++
         }
         else {
@@ -796,7 +740,8 @@ function Install-ApplicationsSequentially {
     Write-Log "Installation summary: $successCount/$totalApps successful" -Component 'INSTALL'
     
     if ($failedApps.Count -gt 0) {
-        Write-Log "Failed to install: $($failedApps -join ', ')" -Level 'WARN' -Component 'INSTALL'
+        $failedList = $failedApps -join ', '
+        Write-Log "Failed to install: $failedList" -Level 'WARN' -Component 'INSTALL'
     }
     
     return @{
@@ -807,147 +752,7 @@ function Install-ApplicationsSequentially {
 }
 
 # ================================
-# Enhanced Error Recovery
-# ================================
-
-function Invoke-ErrorRecovery {
-    param(
-        [string]$Operation,
-        [scriptblock]$RecoveryAction,
-        [int]$MaxAttempts = 3
-    )
-    
-    Write-Log "Attempting recovery for: $Operation" -Component 'RECOVERY'
-    
-    for ($i = 1; $i -le $MaxAttempts; $i++) {
-        try {
-            Write-Log "Recovery attempt $i/$MaxAttempts" -Level 'DEBUG' -Component 'RECOVERY'
-            
-            $result = & $RecoveryAction
-            if ($result) {
-                Write-Log "Recovery successful for: $Operation" -Component 'RECOVERY'
-                return $true
-            }
-        }
-        catch {
-            Write-Log "Recovery attempt $i failed: $_" -Level 'WARN' -Component 'RECOVERY'
-        }
-        
-        if ($i -lt $MaxAttempts) {
-            Start-Sleep -Seconds (5 * $i) # Progressive delay
-        }
-    }
-    
-    Write-Log "Recovery failed for: $Operation" -Level 'ERROR' -Component 'RECOVERY'
-    return $false
-}
-
-# ================================
-# Enhanced Registry Operations with Proper Cleanup
-# ================================
-
-function Mount-UserRegistryHive {
-    param(
-        [string]$HivePath,
-        [string]$MountPoint,
-        [string]$Username
-    )
-    
-    if ($DryRun) {
-        Write-Log "DryRun: Would mount registry hive for $Username" -Level 'INFO' -Component 'REGISTRY'
-        return $true
-    }
-    
-    try {
-        # Check if already mounted
-        if (Test-Path "HKU:\$MountPoint") {
-            Write-Log "Registry hive already mounted for: $Username" -Component 'REGISTRY'
-            return $true
-        }
-        
-        # Mount the hive
-        $result = reg load "HKU\$MountPoint" "$HivePath" 2>&1
-        
-        if ($LASTEXITCODE -eq 0) {
-            Write-Log "Mounted registry hive for: $Username" -Component 'REGISTRY'
-            $Script:MountedRegistryHives += @{
-                Username = $Username
-                MountPoint = $MountPoint
-                HivePath = $HivePath
-            }
-            
-            # Register cleanup with high priority
-            Register-ResourceCleanup -Type 'RegistryHive' -Name $Username -Priority 100 -CleanupAction {
-                Dismount-RegistryHive -MountPoint $MountPoint -Username $Username
-            }.GetNewClosure()
-            
-            return $true
-        }
-        else {
-            Write-Log "Failed to mount hive for $Username : $result" -Level 'ERROR' -Component 'REGISTRY'
-            return $false
-        }
-    }
-    catch {
-        Write-Log "Exception mounting hive for $Username : $_" -Level 'ERROR' -Component 'REGISTRY'
-        return $false
-    }
-}
-
-function Dismount-RegistryHive {
-    param(
-        [string]$MountPoint,
-        [string]$Username
-    )
-    
-    if ($DryRun) { return $true }
-    
-    $maxAttempts = 5
-    $attempt = 0
-    
-    while ($attempt -lt $maxAttempts) {
-        $attempt++
-        
-        Write-Log "Dismounting registry hive for $Username (Attempt $attempt/$maxAttempts)" -Level 'DEBUG' -Component 'REGISTRY'
-        
-        # Force cleanup
-        [System.GC]::Collect()
-        [System.GC]::WaitForPendingFinalizers()
-        [System.GC]::Collect()
-        
-        # Close any handles
-        try {
-            $key = [Microsoft.Win32.Registry]::Users.OpenSubKey($MountPoint, $false)
-            if ($key) {
-                $key.Close()
-                $key.Dispose()
-            }
-        }
-        catch { }
-        
-        Start-Sleep -Seconds 2
-        
-        # Attempt unmount
-        $result = reg unload "HKU\$MountPoint" 2>&1
-        
-        if ($LASTEXITCODE -eq 0) {
-            Write-Log "Successfully dismounted registry hive for: $Username" -Component 'REGISTRY'
-            return $true
-        }
-        
-        if ($attempt -lt $maxAttempts) {
-            $delay = 5 * $attempt
-            Write-Log "Waiting $delay seconds before retry..." -Level 'DEBUG' -Component 'REGISTRY'
-            Start-Sleep -Seconds $delay
-        }
-    }
-    
-    Write-Log "Failed to dismount registry hive for $Username after $maxAttempts attempts" -Level 'WARN' -Component 'REGISTRY'
-    return $false
-}
-
-# ================================
-# Main Execution with Comprehensive Error Handling
+# Main Execution
 # ================================
 
 try {
@@ -975,7 +780,7 @@ try {
     # Export configuration if requested
     if ($ExportWingetApps) {
         $exportPath = Join-Path $PSScriptRoot "deployment_config.json"
-        $Script:Config.SaveToFile($exportPath)
+        $Script:Config | ConvertTo-Json -Depth 10 | Set-Content $exportPath -Encoding UTF8
         Write-Log "Configuration exported to: $exportPath" -Component 'MAIN'
         exit 0
     }
@@ -986,7 +791,7 @@ try {
     # Bloatware removal
     if (-not $SkipBloatwareRemoval) {
         Write-Host "`nRemoving bloatware..." -ForegroundColor Yellow
-        # Implementation would go here
+        # Implementation would go here (keeping simplified for this version)
         Write-Log "Bloatware removal completed" -Component 'REMOVAL'
     }
     
@@ -1014,7 +819,6 @@ try {
     }
     
     Write-Host "`n=== DEPLOYMENT COMPLETED ===" -ForegroundColor Green
-    
 }
 catch {
     Write-Log "Critical error occurred: $_" -Level 'CRITICAL' -Component 'MAIN'
@@ -1043,6 +847,7 @@ finally {
     }
     
     $duration = (Get-Date) - $Script:StartTime
-    Write-Host "`nTotal execution time: $($duration.ToString('mm\:ss'))"
+    $durationString = "{0:mm\:ss}" -f [datetime]$duration.Ticks
+    Write-Host "`nTotal execution time: $durationString"
     Write-Host "Log file: $LogPath" -ForegroundColor Gray
 }
