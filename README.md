@@ -1,4 +1,4 @@
-# DeployWorkstation-AllUsers.ps1 v4.0
+# DeployWorkstation-AllUsers v4.0
 
 ## Overview
 Version 4.0 implements comprehensive improvements for reliability, maintainability, and recovery capabilities.
