@@ -76,156 +76,6 @@ param(
     [switch]$DryRun
 )
 
-function Remove-WingetApps {
-    param([string[]]$AppPatterns)
-    
-    Write-Log "Starting winget app removal..." -Component 'REMOVAL'
-    
-    foreach ($pattern in $AppPatterns) {
-        Write-Log "Searching for apps matching: $pattern" -Component 'REMOVAL'
-        
-        try {
-            if ($DryRun) {
-                Write-Log "DryRun: Would search and remove apps matching '$pattern'" -Level 'INFO' -Component 'REMOVAL'
-                $Script:ActionsSummary.AppsRemoved += "DryRun-$pattern"
-                continue
-            }
-            
-            # Use enhanced app search
-            $foundApps = Get-WingetAppByPattern -Pattern $pattern
-            
-            if ($foundApps -and $foundApps.Count -gt 0) {
-                Write-Log "Found $($foundApps.Count) app(s) matching '$pattern'" -Component 'REMOVAL'
-                
-                foreach ($app in $foundApps) {
-                    if ($app -is [string]) {
-                        $appName = $app
-                        $uninstallCmd = "winget uninstall --name `"$pattern`" --silent --force --accept-source-agreements"
-                    } else {
-                        $appName = $app.Name
-                        $uninstallCmd = "winget uninstall --id `"$($app.Id)`" --silent --force --accept-source-agreements"
-                    }
-                    
-                    Write-Log "Attempting to uninstall: $appName" -Component 'REMOVAL'
-                    $result = Invoke-WingetCommand -Command $uninstallCmd -AppName $appName
-                    
-                    if ($result) {
-                        Write-Log "Successfully removed: $appName" -Component 'REMOVAL'
-                        $Script:ActionsSummary.AppsRemoved += $appName
-                    } else {
-                        Write-Log "Failed to remove: $appName" -Level 'WARN' -Component 'REMOVAL' -ErrorCode 3001
-                    }
-                }
-            } else {
-                Write-Log "No apps found matching: $pattern" -Component 'REMOVAL'
-            }
-        }
-        catch {
-            Write-Log "Error processing $pattern`: $($_.Exception.Message)" -Level 'ERROR' -Component 'REMOVAL' -ErrorCode 3000
-        }
-    }
-}
-
-function Remove-AppxPackagesAllUsers {
-    Write-Log "Removing UWP/Appx packages for all users..." -Component 'APPX'
-    
-    $packagesToRemove = @(
-        '*Microsoft.OutlookForWindows*',
-        '*Clipchamp*',
-        '*MicrosoftFamily*',
-        '*OneDrive*',
-        '*LinkedIn*',
-        '*Xbox*',
-        '*Skype*',
-        '*MixedReality*',
-        '*RemoteDesktop*',
-        '*QuickAssist*',
-        '*MicrosoftTeams*',
-        '*Disney*',
-        '*Netflix*',
-        '*Spotify*',
-        '*TikTok*',
-        '*Instagram*',
-        '*Facebook*',
-        '*Candy*',
-        '*Twitter*',
-        '*Minecraft*'
-    )
-    
-    foreach ($packagePattern in $packagesToRemove) {
-        Write-Log "Processing Appx package: $packagePattern" -Component 'APPX'
-        
-        if ($DryRun) {
-            Write-Log "DryRun: Would remove Appx package pattern '$packagePattern'" -Level 'INFO' -Component 'APPX'
-            $Script:ActionsSummary.PackagesRemoved += "DryRun-$packagePattern"
-            continue
-        }
-        
-        try {
-            # Remove for all users (current and future)
-            $packages = Get-AppxPackage -AllUsers -Name $packagePattern -ErrorAction SilentlyContinue
-            foreach ($package in $packages) {
-                Write-Log "Removing package for all users: $($package.Name)" -Component 'APPX'
-                Remove-AppxPackage -Package $package.PackageFullName -AllUsers -ErrorAction SilentlyContinue
-                $Script:ActionsSummary.PackagesRemoved += $package.Name
-            }
-            
-            # Remove provisioned packages (affects new user accounts)
-            $provisionedPackages = Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue |
-                                 Where-Object { $_.DisplayName -like $packagePattern }
-            
-            foreach ($package in $provisionedPackages) {
-                Write-Log "Removing provisioned package: $($package.DisplayName)" -Component 'APPX'
-                Remove-AppxProvisionedPackage -Online -PackageName $package.PackageName -ErrorAction SilentlyContinue
-                $Script:ActionsSummary.PackagesRemoved += $package.DisplayName
-            }
-        }
-        catch {
-            Write-Log "Error removing $packagePattern`: $($_.Exception.Message)" -Level 'WARN' -Component 'APPX' -ErrorCode 3002
-        }
-    }
-}
-
-# ================================
-# Enhanced Application Installation with Parallel Processing
-# ================================
-
-function Install-StandardApps {
-    Write-Log "Installing standard applications..." -Component 'INSTALL'
-    
-    $appsToInstall = @(
-        @{ Id = 'Malwarebytes.Malwarebytes'; Name = 'Malwarebytes' },
-        @{ Id = 'BleachBit.BleachBit'; Name = 'BleachBit' },
-        @{ Id = 'Google.Chrome'; Name = 'Google Chrome' },
-        @{ Id = 'Microsoft.DotNet.DesktopRuntime.7'; Name = '.NET 7 Desktop Runtime' },
-        @{ Id = 'Adobe.Acrobat.Reader.64-bit'; Name = 'Adobe Reader' },
-        @{ Id = 'Zoom.Zoom'; Name = 'Zoom' },
-        @{ Id = '7zip.7zip'; Name = '7-Zip' },
-        @{ Id = 'VideoLAN.VLC'; Name = 'VLC Media Player' }
-    )
-    
-    # Add Java runtimes if not skipped
-    if (-not $SkipJavaRuntimes) {
-        $appsToInstall += @{ Id = 'Oracle.JavaRuntimeEnvironment'; Name = 'Java Runtime Environment' }
-    } else {
-        Write-Log "Skipping Java runtime installation (SkipJavaRuntimes flag set)" -Component 'INSTALL'
-    }
-    
-    if ($DryRun) {
-        Write-Log "DryRun: Would install $($appsToInstall.Count) applications" -Level 'INFO' -Component 'INSTALL'
-        foreach ($app in $appsToInstall) {
-            $Script:ActionsSummary.AppsInstalled += "DryRun-$($app.Name)"
-        }
-        return $appsToInstall.Count
-    }
-    
-    # Use parallel installation for better performance
-    $successCount = Invoke-ParallelWingetInstall -AppList $appsToInstall -MaxConcurrentJobs 3
-    
-    Write-Log "App installation complete: $successCount/$($appsToInstall.Count) successful" -Component 'INSTALL'
-    return $successCount
-}
-
 # ================================
 # Telemetry and Summary Functions
 # ================================
@@ -1103,12 +953,12 @@ function Remove-WingetApps {
             Write-Log "Error processing $pattern`: $($_.Exception.Message)" -Level 'ERROR' -Component 'REMOVAL' -ErrorCode 3000
         }
     }
-    
+
     Write-Log "Winget app removal completed" -Component 'REMOVAL'
 }
 
 function Remove-AppxPackagesAllUsers {
-    Write-Log "Removing UWP/Appx packages for all users..."
+    Write-Log "Removing UWP/Appx packages for all users..." -Component 'APPX'
     
     $packagesToRemove = @(
         '*Microsoft.OutlookForWindows*',
@@ -1134,10 +984,11 @@ function Remove-AppxPackagesAllUsers {
     )
     
     foreach ($packagePattern in $packagesToRemove) {
-        Write-Log "Processing Appx package: $packagePattern"
+        Write-Log "Processing Appx package: $packagePattern" -Component 'APPX'
         
         if ($DryRun) {
-            Write-Log "DryRun: Would remove Appx package pattern '$packagePattern'" -Level 'INFO'
+            Write-Log "DryRun: Would remove Appx package pattern '$packagePattern'" -Level 'INFO' -Component 'APPX'
+            $Script:ActionsSummary.PackagesRemoved += "DryRun-$packagePattern"
             continue
         }
         
@@ -1145,8 +996,9 @@ function Remove-AppxPackagesAllUsers {
             # Remove for all users (current and future)
             $packages = Get-AppxPackage -AllUsers -Name $packagePattern -ErrorAction SilentlyContinue
             foreach ($package in $packages) {
-                Write-Log "Removing package for all users: $($package.Name)"
+                Write-Log "Removing package for all users: $($package.Name)" -Component 'APPX'
                 Remove-AppxPackage -Package $package.PackageFullName -AllUsers -ErrorAction SilentlyContinue
+                $Script:ActionsSummary.PackagesRemoved += $package.Name
             }
             
             # Remove provisioned packages (affects new user accounts)
@@ -1154,12 +1006,13 @@ function Remove-AppxPackagesAllUsers {
                                  Where-Object { $_.DisplayName -like $packagePattern }
             
             foreach ($package in $provisionedPackages) {
-                Write-Log "Removing provisioned package: $($package.DisplayName)"
+                Write-Log "Removing provisioned package: $($package.DisplayName)" -Component 'APPX'
                 Remove-AppxProvisionedPackage -Online -PackageName $package.PackageName -ErrorAction SilentlyContinue
+                $Script:ActionsSummary.PackagesRemoved += $package.DisplayName
             }
         }
         catch {
-            Write-Log "Error removing $packagePattern`: $($_.Exception.Message)" -Level 'WARN'
+            Write-Log "Error removing $packagePattern`: $($_.Exception.Message)" -Level 'WARN' -Component 'APPX' -ErrorCode 3002
         }
     }
 }
@@ -1284,53 +1137,100 @@ function Remove-McAfeeProducts {
 }
 
 # ================================
-# Enhanced Application Installation
+# Enhanced Application Installation with Parallel Processing
 # ================================
 
 function Install-StandardApps {
-    Write-Log "Installing standard applications..."
+    param(
+        [int]$MaxConcurrentJobs = 3
+    )
     
-    $appsToInstall = @(
+	Write-Log "Installing standard applications and runtime libraries..."
+	
+    # Core applications
+    $coreApps = @(
         @{ Id = 'Malwarebytes.Malwarebytes'; Name = 'Malwarebytes' },
         @{ Id = 'BleachBit.BleachBit'; Name = 'BleachBit' },
         @{ Id = 'Google.Chrome'; Name = 'Google Chrome' },
-        @{ Id = 'Microsoft.DotNet.DesktopRuntime.7'; Name = '.NET 7 Desktop Runtime' },
         @{ Id = 'Adobe.Acrobat.Reader.64-bit'; Name = 'Adobe Reader' },
         @{ Id = 'Zoom.Zoom'; Name = 'Zoom' },
         @{ Id = '7zip.7zip'; Name = '7-Zip' },
         @{ Id = 'VideoLAN.VLC'; Name = 'VLC Media Player' }
     )
     
-    # Add Java runtimes if not skipped
-    if (-not $SkipJavaRuntimes) {
-        $appsToInstall += @{ Id = 'Oracle.JavaRuntimeEnvironment'; Name = 'Java Runtime Environment' }
-    } else {
-        Write-Log "Skipping Java runtime installation (SkipJavaRuntimes flag set)"
-    }
+    # .NET Framework and Desktop Runtimes
+    $dotnetApps = @(
+        @{ Id = 'Microsoft.DotNet.Framework.4.8.1'; Name = '.NET Framework 4.8.1' },
+        @{ Id = 'Microsoft.DotNet.DesktopRuntime.8'; Name = '.NET Desktop Runtime 8' },
+        @{ Id = 'Microsoft.DotNet.DesktopRuntime.8'; Name = '.NET Desktop Runtime x64 8' },  # Same package for x64
+        @{ Id = 'Microsoft.DotNet.DesktopRuntime.9'; Name = '.NET Desktop Runtime 9' },
+        @{ Id = 'Microsoft.DotNet.DesktopRuntime.9'; Name = '.NET Desktop Runtime x64 9' }   # Same package for x64
+    )
     
-    $successCount = 0
-    $totalCount = $appsToInstall.Count
-    
-    foreach ($app in $appsToInstall) {
-        Write-Log "Installing: $($app.Name) ($($app.Id))"
+    # Visual C++ Redistributables (All requested versions - x64 and x86 only)
+    $vcredistApps = @(
+        # 2015+ (Latest - recommended)
+        @{ Id = 'Microsoft.VCRedist.2015+.x64'; Name = 'VC Redist x64 2015+' },
+        @{ Id = 'Microsoft.VCRedist.2015+.x86'; Name = 'VC Redist x86 2015+' },
         
-        if ($DryRun) {
-            Write-Log "DryRun: Would install $($app.Name)" -Level 'INFO'
-            $successCount++
-            continue
-        }
+        # 2013
+        @{ Id = 'Microsoft.VCRedist.2013.x64'; Name = 'VC Redist x64 2013' },
+        @{ Id = 'Microsoft.VCRedist.2013.x86'; Name = 'VC Redist x86 2013' },
         
-        $result = Invoke-WingetCommand -Command "winget install --id $($app.Id) --source winget --accept-package-agreements --accept-source-agreements --silent"
+        # 2012
+        @{ Id = 'Microsoft.VCRedist.2012.x64'; Name = 'VC Redist x64 2012' },
+        @{ Id = 'Microsoft.VCRedist.2012.x86'; Name = 'VC Redist x86 2012' },
         
-        if ($result) {
-            Write-Log "Successfully installed: $($app.Name)"
-            $successCount++
-        } else {
-            Write-Log "Failed to install: $($app.Name)" -Level 'WARN'
-        }
-    }
+        # 2010
+        @{ Id = 'Microsoft.VCRedist.2010.x64'; Name = 'VC Redist x64 2010' },
+        @{ Id = 'Microsoft.VCRedist.2010.x86'; Name = 'VC Redist x86 2010' },
+        
+        # 2008
+        @{ Id = 'Microsoft.VCRedist.2008.x64'; Name = 'VC Redist x64 2008' },
+        @{ Id = 'Microsoft.VCRedist.2008.x86'; Name = 'VC Redist x86 2008' },
+        
+        # 2005
+        @{ Id = 'Microsoft.VCRedist.2005.x64'; Name = 'VC Redist x64 2005' },
+        @{ Id = 'Microsoft.VCRedist.2005.x86'; Name = 'VC Redist x86 2005' }
+    )
+
+	# Combine app lists based on parameters
+	$appsToInstall = $coreApps + $dotnetApps + $vcredistApps
+
+	# Add Java runtimes if not skipped
+	$javaApps = @()	
+	if (-not $SkipJavaRuntimes) {
+		$javaApps = @(@{ Id = 'Oracle.JavaRuntimeEnvironment'; Name = 'Java Runtime Environment' })
+		$appsToInstall += $javaApps
+	}
+
+		if ($DryRun) {
+			Write-Log "DryRun: Would install $($appsToInstall.Count) applications" -Level 'INFO' -Component 'INSTALL'
+			foreach ($app in $appsToInstall) {
+				$Script:ActionsSummary.AppsInstalled += "DryRun-$($app.Name)"
+			}
+			return $appsToInstall.Count
+		}
+
+	$totalCount = $appsToInstall.Count
+
+	Write-Log "Installing $totalCount applications and runtime libraries..."
+	Write-Log "Categories: Core Apps ($($coreApps.Count)), .NET ($($dotnetApps.Count)), VC++ Redist ($($vcredistApps.Count)), Java Runtime ($(if (-not $SkipJavaRuntimes) { 1 } else { 0 }))"
+
+	$successCount = Invoke-ParallelWingetInstall -AppList $appsToInstall -MaxConcurrentJobs 3
     
     Write-Log "App installation complete: $successCount/$totalCount successful"
+    
+    # Log summary by category
+    Write-Log "Installation Summary:"
+    Write-Log "- Core Applications: $($coreApps.Count) packages"
+    Write-Log "- .NET Frameworks/Runtimes: $($dotnetApps.Count) packages"
+    Write-Log "- Visual C++ Redistributables: $($vcredistApps.Count) packages"
+	if (-not $SkipJavaRuntimes) {
+    Write-Log "- Java Runtime: $($javaApps.Count) package(s)"
+	}
+
+	return ($successCount -ge ($totalCount * 0.8))  # Consider successful if 80% or more installed
 }
 
 # ================================
