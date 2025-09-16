@@ -1,5 +1,5 @@
 # DeployWorkstation.ps1 - Changelog
-## [DeployWorkstation-AllUsers.ps1 - Version 3.0] - 2025-09-15
+## DeployWorkstation-AllUsers.ps1 - Version 3.0 - 09-15-2025
 
 ### Added
 - Dry-run mode for safe simulation of all actions.
