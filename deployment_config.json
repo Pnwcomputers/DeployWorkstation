@@ -1,0 +1,264 @@
+{
+  "SystemRequirements": {
+    "MinWindowsVersion": "10.0.0.0",
+    "RequiredCommands": ["reg", "winget", "powershell"],
+    "MinFreeDiskSpaceGB": 10,
+    "MinMemoryGB": 4
+  },
+  
+  "Applications": {
+    "Core": [
+      {
+        "Id": "Malwarebytes.Malwarebytes",
+        "Name": "Malwarebytes",
+        "Category": "Security"
+      },
+      {
+        "Id": "BleachBit.BleachBit",
+        "Name": "BleachBit",
+        "Category": "Utilities"
+      },
+      {
+        "Id": "Google.Chrome",
+        "Name": "Google Chrome",
+        "Category": "Browser"
+      },
+      {
+        "Id": "Mozilla.Firefox",
+        "Name": "Mozilla Firefox",
+        "Category": "Browser"
+      },
+      {
+        "Id": "Adobe.Acrobat.Reader.64-bit",
+        "Name": "Adobe Reader",
+        "Category": "Productivity"
+      },
+      {
+        "Id": "Zoom.Zoom",
+        "Name": "Zoom",
+        "Category": "Communication"
+      },
+      {
+        "Id": "7zip.7zip",
+        "Name": "7-Zip",
+        "Category": "Utilities"
+      },
+      {
+        "Id": "VideoLAN.VLC",
+        "Name": "VLC Media Player",
+        "Category": "Media"
+      },
+      {
+        "Id": "Notepad++.Notepad++",
+        "Name": "Notepad++",
+        "Category": "Development"
+      }
+    ],
+    
+    "DotNet": [
+      {
+        "Id": "Microsoft.DotNet.Framework.4.8.1",
+        "Name": ".NET Framework 4.8.1"
+      },
+      {
+        "Id": "Microsoft.DotNet.DesktopRuntime.8",
+        "Name": ".NET Desktop Runtime 8"
+      },
+      {
+        "Id": "Microsoft.DotNet.DesktopRuntime.9",
+        "Name": ".NET Desktop Runtime 9"
+      }
+    ],
+    
+    "VCRedist": [
+      {
+        "Id": "Microsoft.VCRedist.2015+.x64",
+        "Name": "VC Redist x64 2015+"
+      },
+      {
+        "Id": "Microsoft.VCRedist.2015+.x86",
+        "Name": "VC Redist x86 2015+"
+      },
+      {
+        "Id": "Microsoft.VCRedist.2013.x64",
+        "Name": "VC Redist x64 2013"
+      },
+      {
+        "Id": "Microsoft.VCRedist.2013.x86",
+        "Name": "VC Redist x86 2013"
+      },
+      {
+        "Id": "Microsoft.VCRedist.2012.x64",
+        "Name": "VC Redist x64 2012"
+      },
+      {
+        "Id": "Microsoft.VCRedist.2012.x86",
+        "Name": "VC Redist x86 2012"
+      },
+      {
+        "Id": "Microsoft.VCRedist.2010.x64",
+        "Name": "VC Redist x64 2010"
+      },
+      {
+        "Id": "Microsoft.VCRedist.2010.x86",
+        "Name": "VC Redist x86 2010"
+      }
+    ],
+    
+    "Java": [
+      {
+        "Id": "Oracle.JavaRuntimeEnvironment",
+        "Name": "Java Runtime Environment"
+      }
+    ],
+    
+    "Optional": [
+      {
+        "Id": "Microsoft.PowerShell",
+        "Name": "PowerShell 7",
+        "Category": "Development"
+      },
+      {
+        "Id": "Git.Git",
+        "Name": "Git",
+        "Category": "Development"
+      },
+      {
+        "Id": "Microsoft.VisualStudioCode",
+        "Name": "Visual Studio Code",
+        "Category": "Development"
+      },
+      {
+        "Id": "Python.Python.3.12",
+        "Name": "Python 3.12",
+        "Category": "Development"
+      }
+    ]
+  },
+  
+  "BloatwarePatterns": [
+    "CoPilot",
+    "Outlook",
+    "Quick Assist",
+    "Remote Desktop",
+    "Mixed Reality Portal",
+    "Clipchamp",
+    "Xbox",
+    "Family",
+    "Skype",
+    "LinkedIn",
+    "OneDrive",
+    "Teams",
+    "Disney",
+    "Netflix",
+    "Spotify",
+    "TikTok",
+    "Instagram",
+    "Facebook",
+    "Candy",
+    "Twitter",
+    "Minecraft",
+    "Solitaire",
+    "Bubble Witch",
+    "March of Empires",
+    "Hidden City",
+    "Dolby",
+    "Fitbit"
+  ],
+  
+  "ServicesToDisable": [
+    "DiagTrack",
+    "dmwappushservice",
+    "lfsvc",
+    "MapsBroker",
+    "NetTcpPortSharing",
+    "RemoteAccess",
+    "RemoteRegistry",
+    "SharedAccess",
+    "TrkWks",
+    "WbioSrvc",
+    "WMPNetworkSvc",
+    "XblAuthManager",
+    "XblGameSave",
+    "XboxNetApiSvc",
+    "XboxGipSvc",
+    "WSearch",
+    "SysMain"
+  ],
+  
+  "CapabilitiesToRemove": [
+    "App.Support.QuickAssist~~~~0.0.1.0",
+    "App.Xbox.TCUI~~~~0.0.1.0",
+    "App.XboxGameOverlay~~~~0.0.1.0",
+    "App.XboxSpeechToTextOverlay~~~~0.0.1.0",
+    "App.StepsRecorder~~~~0.0.1.0",
+    "Browser.InternetExplorer~~~~0.0.11.0",
+    "MathRecognizer~~~~0.0.1.0",
+    "Print.Fax.Scan~~~~0.0.1.0",
+    "Microsoft.Windows.PowerShell.ISE~~~~0.0.1.0"
+  ],
+  
+  "RegistrySettings": {
+    "System": {
+      "DisableTelemetry": {
+        "Path": "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection",
+        "Values": {
+          "AllowTelemetry": 0,
+          "MaxTelemetryAllowed": 0
+        }
+      },
+      "DisableConsumerFeatures": {
+        "Path": "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\CloudContent",
+        "Values": {
+          "DisableWindowsConsumerFeatures": 1,
+          "DisableConsumerAccountStateContent": 1
+        }
+      },
+      "DisableAdvertisingID": {
+        "Path": "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\AdvertisingInfo",
+        "Values": {
+          "DisabledByGroupPolicy": 1
+        }
+      }
+    },
+    "User": {
+      "DisableContentDelivery": {
+        "Path": "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager",
+        "Values": {
+          "SilentInstalledAppsEnabled": 0,
+          "SystemPaneSuggestionsEnabled": 0,
+          "SoftLandingEnabled": 0
+        }
+      }
+    }
+  },
+  
+  "AppxPackagesToRemove": [
+    "*Microsoft.OutlookForWindows*",
+    "*Clipchamp*",
+    "*MicrosoftFamily*",
+    "*OneDrive*",
+    "*LinkedIn*",
+    "*Xbox*",
+    "*Skype*",
+    "*MixedReality*",
+    "*RemoteDesktop*",
+    "*QuickAssist*",
+    "*MicrosoftTeams*",
+    "*Disney*",
+    "*Netflix*",
+    "*Spotify*",
+    "*TikTok*",
+    "*Instagram*",
+    "*Facebook*",
+    "*Candy*",
+    "*Twitter*",
+    "*Minecraft*",
+    "*Solitaire*",
+    "*BubbleWitch*",
+    "*MarchofEmpires*",
+    "*HiddenCity*",
+    "*Dolby*",
+    "*Fitbit*"
+  ]
+}
