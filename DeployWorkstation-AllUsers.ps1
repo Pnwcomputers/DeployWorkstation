@@ -233,6 +233,7 @@ function Get-DefaultConfiguration {
             
             DotNet = @(
                 @{ Id = 'Microsoft.DotNet.Framework.4.8.1'; Name = '.NET Framework 4.8.1' }
+                @{ Id = 'Microsoft.DotNet.DesktopRuntime.7'; Name = '.NET Desktop Runtime 7' }
                 @{ Id = 'Microsoft.DotNet.DesktopRuntime.8'; Name = '.NET Desktop Runtime 8' }
                 @{ Id = 'Microsoft.DotNet.DesktopRuntime.9'; Name = '.NET Desktop Runtime 9' }
             )
@@ -851,3 +852,4 @@ finally {
     Write-Host "`nTotal execution time: $durationString"
     Write-Host "Log file: $LogPath" -ForegroundColor Gray
 }
+
