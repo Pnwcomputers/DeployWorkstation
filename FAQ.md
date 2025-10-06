@@ -1,4 +1,4 @@
-# DeployWorkstation.ps1 - FAQ
+# DeployWorkstation - FAQ
 ## DeployWorkstation - Versions 1.0 -> 4.0 (10-6-2025)
 
 ### Frequent Questions & Answers:
