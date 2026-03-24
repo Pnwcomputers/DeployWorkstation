@@ -270,8 +270,8 @@ winget list --source winget
 ## 🔮 Roadmap
 
 ### Version 3.0 (Q2 2026)
-- 🔄 Configuration Management Integration
 - 🚀 Advanced Reporting
+- 🔄 Configuration Management Integration
 
 ### Future Enhancements
 - 📊 Analytics and Telemetry
