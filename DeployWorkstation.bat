@@ -2,13 +2,13 @@
 REM ========================================================
 REM  DeployWorkstation.bat
 REM  Launcher for DeployWorkstation.ps1
-REM  Version 4.0 – PNWC Edition
+REM  Version 6.0 – PNWC Edition
 REM ========================================================
 
 setlocal enabledelayedexpansion
 
 echo.
-echo ===== DeployWorkstation Launcher v4.0 =====
+echo ===== DeployWorkstation Launcher v6.0 =====
 echo.
 
 REM --------------------------------------------------------
