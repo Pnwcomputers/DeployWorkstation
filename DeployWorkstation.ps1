@@ -22,20 +22,20 @@ $ErrorActionPreference = 'Continue'
 $ProgressPreference    = 'Continue'          # Must be Continue for Write-Progress to render
 $script:StartTime      = Get-Date
 
-if (-not $PSScriptRoot) {
-    $PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-}
+# $PSScriptRoot is read-only in PS5.1 — use a separate variable for fallback safety
+$scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 
-if (-not $LogPath)    { $LogPath    = Join-Path $PSScriptRoot 'DeployWorkstation.log'  }
-if (-not $ReportPath) { $ReportPath = Join-Path $PSScriptRoot 'DeployWorkstation.html' }
+if (-not $LogPath)    { $LogPath    = Join-Path $scriptRoot 'DeployWorkstation.log'  }
+if (-not $ReportPath) { $ReportPath = Join-Path $scriptRoot 'DeployWorkstation.html' }
 
 # --------------------------------
 # Restart in Windows PowerShell 5.1 if running under PS Core
 # --------------------------------
 if ($PSVersionTable.PSEdition -eq 'Core') {
     Write-Warning 'PowerShell Core detected. Restarting in Windows PowerShell 5.1...'
-    $params = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath,
-                '-LogPath', $LogPath, '-ReportPath', $ReportPath)
+    # Wrap path values in escaped quotes so spaces in paths survive Start-Process argument joining
+    $params = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"",
+                '-LogPath', "`"$LogPath`"", '-ReportPath', "`"$ReportPath`"")
     if ($SkipAppInstall)       { $params += '-SkipAppInstall' }
     if ($SkipBloatwareRemoval) { $params += '-SkipBloatwareRemoval' }
     if ($SkipSystemConfig)     { $params += '-SkipSystemConfig' }
@@ -1087,6 +1087,7 @@ try {
 
     Set-OverallProgress -Status (T 'PhaseReporting') -Percent $script:PhasePct.ConfigEnd
     Export-HtmlReport -OverallStatus $overallStatus
+    Set-OverallProgress -Status (T 'Completed') -Percent $script:PhasePct.Done
 
     Write-Log "===== $(T 'Completed') =====" -Level 'SUCCESS'
     Write-Host "`n*** $(T 'SetupComplete') ***" -ForegroundColor Green
