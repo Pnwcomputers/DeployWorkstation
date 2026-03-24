@@ -818,7 +818,7 @@ function Export-HtmlReport {
     $ramGB       = [math]::Round($os.TotalVisibleMemorySize / 1MB, 1)
     $uptimeHrs   = [math]::Round(((Get-Date) - $os.LastBootUpTime).TotalHours, 1)
     $duration     = (Get-Date) - $script:StartTime
-    $durationMins = [int]$duration.TotalMinutes
+    $durationMins = [Math]::Floor($duration.TotalMinutes)
     $durationSecs = $duration.Seconds
     $durationFmt  = "${durationMins}m ${durationSecs}s"
     $timestamp    = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
