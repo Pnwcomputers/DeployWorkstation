@@ -307,7 +307,7 @@ We welcome contributions! Here's how to get started:
 - Consider implementation complexity
 
 ### 🔒 Security Issues
-- Email security@pnwcomputers.com
+- Email [support@pnwcomputers.com](mailto:support@pnwcomputers.com)
 - Include proof of concept (if safe)
 - Allow reasonable disclosure time
 
@@ -320,7 +320,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) f
 - 📖 **Documentation**: Check this README and project wiki
 - 🐛 **Bug Reports**: Open an issue on GitHub
 - 💡 **Feature Requests**: Open an issue with [FEATURE] tag
-- 🔒 **Security Issues**: Email [security@pnwcomputers.com](mailto:security@pnwcomputers.com)
 - 💬 **General Support**: Email [support@pnwcomputers.com](mailto:support@pnwcomputers.com)
 
 ---
