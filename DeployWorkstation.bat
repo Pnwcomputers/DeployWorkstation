@@ -8,7 +8,7 @@ REM ========================================================
 setlocal enabledelayedexpansion
 
 echo.
-echo ===== DeployWorkstation Launcher v6.0 =====
+echo ===== DeployWorkstation Launcher v5.0 =====
 echo.
 
 REM --------------------------------------------------------
