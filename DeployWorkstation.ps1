@@ -54,7 +54,7 @@ $script:Strings = @{
 
     'en-US' = @{
         # Startup
-        Started           = 'DeployWorkstation v6.0 Started'
+        Started           = 'DeployWorkstation v5.0 Started'
         WingetRequired    = "Winget is required. Install 'App Installer' from the Microsoft Store."
         WingetFound       = 'Winget found'
         WingetMissing     = 'Winget not found on PATH.'
@@ -171,7 +171,7 @@ $script:Strings = @{
 
     'es-ES' = @{
         # Startup
-        Started           = 'DeployWorkstation v6.0 Iniciado'
+        Started           = 'DeployWorkstation v5.0 Iniciado'
         WingetRequired    = "Se requiere Winget. Instale 'App Installer' desde Microsoft Store."
         WingetFound       = 'Winget encontrado'
         WingetMissing     = 'Winget no encontrado en el PATH.'
@@ -947,7 +947,7 @@ function Export-HtmlReport {
   <div class="info-card"><div class="label">$lRAM</div><div class="value">$ramGB GB</div></div>
   <div class="info-card"><div class="label">$lUptime</div><div class="value">$uptimeHrs $lHrs</div></div>
   <div class="info-card"><div class="label">$lRunTime</div><div class="value">$durationFmt</div></div>
-  <div class="info-card"><div class="label">$lVersion</div><div class="value">6.0</div></div>
+  <div class="info-card"><div class="label">$lVersion</div><div class="value">5.0</div></div>
   <div class="info-card"><div class="label">$lTechnician</div><div class="value">PNWC</div></div>
 </div>
 
