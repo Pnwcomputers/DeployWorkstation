@@ -269,23 +269,21 @@ winget list --source winget
 
 ## 🔮 Roadmap
 
-### Version 1.1 (Q3 2025)
+### Version 3.0 (Q2 2026)
+- 🔄 Configuration Management Integration
+- 🚀 Advanced Reporting
+
+### Future Enhancements
+- 📊 Analytics and Telemetry
+- 🤖 AI-Powered Optimization
+- 🌐 Web-based Management Console
+- 🚀 Windows Server Support
+- 🚀 Domain Integration
+- 🚀 Cloud Configuration Sync
 - ✅ GUI Configuration Interface
 - ✅ Network Deployment Server
 - ✅ Real-time Progress Dashboard
 - ✅ Multi-language Support
-
-### Version 2.0 (Q4 2025)
-- 🚀 Windows Server Support
-- 🚀 Domain Integration
-- 🚀 Cloud Configuration Sync
-- 🚀 Advanced Reporting
-
-### Future Enhancements
-- 🔄 Configuration Management Integration
-- 📊 Analytics and Telemetry
-- 🤖 AI-Powered Optimization
-- 🌐 Web-based Management Console
 
 ## 🤝 Contributing
 
