@@ -270,6 +270,7 @@ winget list --source winget
 ## 🔮 Roadmap
 
 ### Version 3.0 (Q2 2026)
+- 🔧 Improved App Removal & Installation
 - 🚀 Advanced Reporting
 - 🔄 Configuration Management Integration
 - ✅ Multi-language Support
