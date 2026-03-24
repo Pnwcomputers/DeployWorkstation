@@ -11,6 +11,14 @@
 
 A PowerShell-based, automated provisioning solution that transforms Windows 10 & 11 workstation deployment from a 30-step manual process into a single "plug-and-play" operation. Whether you're imaging bare metal or cleaning up an existing PC, DeployWorkstation handles the heavy lifting of bloatware removal and essential application installation.
 
+## 🆕 What's New in Version 5 (Q2 2026)
+
+- 🔧 Improved App Removal & Installation
+- 🚀 Advanced Reporting
+- 🔄 Configuration Management Integration
+- ✅ Multi-language Support
+- ✅ Real-time Progress
+
 ## ✨ Key Features
 
 - **🔐 Self-Elevating & Policy-Bypassing** - Automatically relaunches under Windows PowerShell 5.1 with `-ExecutionPolicy Bypass` and UAC elevation
@@ -209,7 +217,7 @@ $EmailAlerts = $true         # Send completion notifications
 
 ## 🛠️ Project Structure
 
-```
+```text
 DeployWorkstation/
 ├── DeployWorkstation.ps1      # Main PowerShell script
 ├── DeployWorkstation.cmd      # Self-elevating launcher
@@ -269,13 +277,6 @@ winget list --source winget
 
 ## 🔮 Roadmap
 
-### Version5 (Q2 2026)
-- 🔧 Improved App Removal & Installation
-- 🚀 Advanced Reporting
-- 🔄 Configuration Management Integration
-- ✅ Multi-language Support
-- ✅ Real-time Progress
-
 ### Future Enhancements
 - 📊 Analytics and Telemetry
 - 🤖 AI-Powered Optimization
@@ -285,7 +286,6 @@ winget list --source winget
 - 🚀 Cloud Configuration Sync
 - ✅ GUI Configuration Interface
 - ✅ Network Deployment Server
-
 
 ## 🤝 Contributing
 
