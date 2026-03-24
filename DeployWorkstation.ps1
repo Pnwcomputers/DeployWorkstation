@@ -58,9 +58,10 @@ $script:Strings = @{
         WingetRequired    = "Winget is required. Install 'App Installer' from the Microsoft Store."
         WingetFound       = 'Winget found'
         WingetMissing     = 'Winget not found on PATH.'
-        ManagingSources   = 'Managing winget sources...'
-        RemovingMsstore   = 'Removing msstore source (performance)...'
-        RefreshingSources = 'Refreshing winget source index...'
+        ManagingSources   = 'Managing winget sources'
+        ProgSources       = 'Managing Winget Sources'
+        RemovingMsstore   = 'Removing msstore source (performance)'
+        RefreshingSources = 'Refreshing winget source index'
         SourcesFailed     = 'Could not manage winget sources'
 
         # Phase names (console + progress bar)
@@ -98,7 +99,6 @@ $script:Strings = @{
         AlreadyInstalled  = 'Already installed'
         InstallFail       = 'Failed'
         InstallError      = 'Error installing'
-        CapNotInstalled   = 'Not installed'
         CapRemoving       = 'Removing capability'
         CapError          = 'Error with capability'
         McAfeeNone        = 'No McAfee products found.'
@@ -175,9 +175,10 @@ $script:Strings = @{
         WingetRequired    = "Se requiere Winget. Instale 'App Installer' desde Microsoft Store."
         WingetFound       = 'Winget encontrado'
         WingetMissing     = 'Winget no encontrado en el PATH.'
-        ManagingSources   = 'Administrando fuentes de winget...'
-        RemovingMsstore   = 'Eliminando fuente msstore (rendimiento)...'
-        RefreshingSources = 'Actualizando indice de fuentes winget...'
+        ManagingSources   = 'Administrando fuentes de winget'
+        ProgSources       = 'Administrando Fuentes de Winget'
+        RemovingMsstore   = 'Eliminando fuente msstore (rendimiento)'
+        RefreshingSources = 'Actualizando indice de fuentes winget'
         SourcesFailed     = 'No se pudieron administrar las fuentes de winget'
 
         # Phase names
@@ -215,7 +216,6 @@ $script:Strings = @{
         AlreadyInstalled  = 'Ya instalado'
         InstallFail       = 'Fallo'
         InstallError      = 'Error al instalar'
-        CapNotInstalled   = 'No instalado'
         CapRemoving       = 'Eliminando capacidad'
         CapError          = 'Error con capacidad'
         McAfeeNone        = 'No se encontraron productos McAfee.'
@@ -304,6 +304,14 @@ function T {
     param([string]$Key)
     if ($script:Lang.ContainsKey($Key)) { return $script:Lang[$Key] }
     return $Key   # fall back to the key name itself if missing
+}
+
+# ConvertTo-HtmlSafe — encodes special chars so exception messages / paths
+# don't break the HTML report structure
+function ConvertTo-HtmlSafe {
+    param([string]$Text)
+    if (-not $Text) { return '' }
+    $Text -replace '&','&amp;' -replace '<','&lt;' -replace '>','&gt;' -replace '"','&quot;'
 }
 
 # ================================
@@ -457,16 +465,19 @@ function Test-Winget {
 function Initialize-WingetSources {
     Write-Log (T 'ManagingSources')
     try {
-        Set-PhaseProgress -Activity (T 'ManagingSources') -Status (T 'ProgSourcesList') -Current 1 -Total 3
+        Set-PhaseProgress -Activity (T 'ProgSources') -Status (T 'ProgSourcesList') -Current 1 -Total 2
         $sources = winget source list 2>$null
 
         if ($sources -match 'msstore') {
-            Set-PhaseProgress -Activity (T 'ManagingSources') -Status (T 'RemovingMsstore') -Current 2 -Total 3
+            # msstore present — extend to 3 steps
+            Set-PhaseProgress -Activity (T 'ProgSources') -Status (T 'RemovingMsstore') -Current 2 -Total 3
             Write-Log (T 'RemovingMsstore')
             winget source remove --name msstore 2>$null | Out-Null
+            Set-PhaseProgress -Activity (T 'ProgSources') -Status (T 'ProgSourcesUpdate') -Current 3 -Total 3
+        } else {
+            Set-PhaseProgress -Activity (T 'ProgSources') -Status (T 'ProgSourcesUpdate') -Current 2 -Total 2
         }
 
-        Set-PhaseProgress -Activity (T 'ManagingSources') -Status (T 'ProgSourcesUpdate') -Current 3 -Total 3
         Write-Log (T 'RefreshingSources')
         winget source update --name winget 2>$null | Out-Null
     }
@@ -614,7 +625,7 @@ function Remove-WindowsCapabilities {
                 $script:Summary.CapabilitiesRemoved++
                 Add-Result -Section (T 'ProgCaps') -Item $cap -Status 'OK' -Detail (T 'Removed')
             } else {
-                Write-Log "$(T 'CapNotInstalled'): $cap"
+                Write-Log "$(T 'NotInstalled'): $cap"
                 Add-Result -Section (T 'ProgCaps') -Item $cap -Status 'SKIPPED' -Detail (T 'NotInstalled')
             }
         }
@@ -668,17 +679,17 @@ function Remove-McAfeeProducts {
 
         try {
             if ($uninstallString -match '^"([^"]+)"\s*(.*)$') {
-                $exe  = $Matches[1]
-                $args = $Matches[2]
+                $exe           = $Matches[1]
+                $uninstallArgs = $Matches[2]
             } else {
-                $parts = $uninstallString.Split(' ', 2)
-                $exe   = $parts[0]
-                $args  = if ($parts.Length -gt 1) { $parts[1] } else { '' }
+                $parts         = $uninstallString.Split(' ', 2)
+                $exe           = $parts[0]
+                $uninstallArgs = if ($parts.Length -gt 1) { $parts[1] } else { '' }
             }
-            if ($args -notmatch '/S|/silent|/quiet') { $args += ' /S /quiet' }
+            if ($uninstallArgs -notmatch '/S|/silent|/quiet') { $uninstallArgs += ' /S /quiet' }
 
             Write-Log "$(T 'McAfeeUninstall'): $displayName"
-            Start-Process -FilePath $exe -ArgumentList $args -Wait -WindowStyle Hidden -ErrorAction Stop
+            Start-Process -FilePath $exe -ArgumentList $uninstallArgs -Wait -WindowStyle Hidden -ErrorAction Stop
             Write-Log "$(T 'McAfeeRemoved'): $displayName" -Level 'SUCCESS'
             $script:Summary.McAfeeRemoved++
             Add-Result -Section (T 'ProgMcAfee') -Item $displayName -Status 'OK' -Detail (T 'McAfeeRemoved')
@@ -818,17 +829,17 @@ function Export-HtmlReport {
 
     $sections  = $script:Results | Group-Object { $_.Section }
     $tableRows = foreach ($section in $sections) {
-        "<tr class='section-header'><td colspan='3'>$($section.Name)</td></tr>"
+        "<tr class='section-header'><td colspan='3'>$(ConvertTo-HtmlSafe $section.Name)</td></tr>"
         foreach ($r in $section.Group) {
             $css  = switch ($r.Status) { 'OK'{'status-ok'} 'SKIPPED'{'status-skipped'} 'WARN'{'status-warn'} 'FAILED'{'status-failed'} }
             $icon = switch ($r.Status) { 'OK'{'&#10003;'}  'SKIPPED'{'&#8212;'}        'WARN'{'&#9888;'}     'FAILED'{'&#10007;'}      }
-            "<tr><td>$($r.Item)</td><td class='$css'>$icon $($r.Status)</td><td>$($r.Detail)</td></tr>"
+            "<tr><td>$(ConvertTo-HtmlSafe $r.Item)</td><td class='$css'>$icon $($r.Status)</td><td>$(ConvertTo-HtmlSafe $r.Detail)</td></tr>"
         }
     }
 
     $logRows = ($script:EventLog | Select-Object -Last 200) | ForEach-Object {
         $css = switch ($_.Level) { 'ERROR'{'log-error'} 'WARN'{'log-warn'} 'SUCCESS'{'log-success'} 'SECTION'{'log-section'} default{''} }
-        "<tr class='$css'><td>$($_.Timestamp)</td><td>$($_.Level)</td><td>$($_.Message)</td></tr>"
+        "<tr class='$css'><td>$($_.Timestamp)</td><td>$($_.Level)</td><td>$(ConvertTo-HtmlSafe $_.Message)</td></tr>"
     }
 
     # Localized HTML labels
@@ -996,13 +1007,13 @@ function Write-ConsoleSummary {
     Write-Log $border -Level 'SECTION'
     Write-Log (T 'SumTitle') -Level 'SECTION'
     Write-Log $border -Level 'SECTION'
-    Write-Log "$(T 'SumAppsOK')     : $($script:Summary.AppsInstalled)"
-    Write-Log "$(T 'SumAppsFail')         : $($script:Summary.AppsFailed)"
-    Write-Log "$(T 'SumAppx')   : $($script:Summary.AppxRemoved)"
-    Write-Log "$(T 'SumCaps')    : $($script:Summary.CapabilitiesRemoved)"
-    Write-Log "$(T 'SumConfigOK')   : $($script:Summary.HardeningApplied)"
-    Write-Log "$(T 'SumConfigFail') : $($script:Summary.HardeningFailed)"
-    Write-Log "$(T 'SumMcAfee')  : $($script:Summary.McAfeeRemoved)"
+    Write-Log "$( (T 'SumAppsOK')    ) : $($script:Summary.AppsInstalled)"
+    Write-Log "$( (T 'SumAppsFail')  ) : $($script:Summary.AppsFailed)"
+    Write-Log "$( (T 'SumAppx')      ) : $($script:Summary.AppxRemoved)"
+    Write-Log "$( (T 'SumCaps')      ) : $($script:Summary.CapabilitiesRemoved)"
+    Write-Log "$( (T 'SumConfigOK')  ) : $($script:Summary.HardeningApplied)"
+    Write-Log "$( (T 'SumConfigFail')) : $($script:Summary.HardeningFailed)"
+    Write-Log "$( (T 'SumMcAfee')    ) : $($script:Summary.McAfeeRemoved)"
     Write-Log $border -Level 'SECTION'
 }
 
@@ -1012,20 +1023,20 @@ function Write-ConsoleSummary {
 
 # Overall progress weights (must total 100)
 # Phases: Init=5, Bloatware=35, Apps=40, Config=15, Report=5
-$pct = @{ Init = 5; BloatStart = 5; BloatEnd = 40; AppsStart = 40; AppsEnd = 80; ConfigStart = 80; ConfigEnd = 95; Done = 100 }
+$script:PhasePct = @{ Init = 5; BloatStart = 5; BloatEnd = 40; AppsStart = 40; AppsEnd = 80; ConfigStart = 80; ConfigEnd = 95; Done = 100 }
 
 try {
-    Set-OverallProgress -Status (T 'ManagingSources') -Percent $pct.Init
+    Set-OverallProgress -Status (T 'ManagingSources') -Percent $script:PhasePct.Init
 
     if (-not (Test-Winget)) {
         Write-Log (T 'WingetRequired') -Level 'ERROR'
-        exit 1
+        throw 'Winget not available'
     }
 
     Initialize-WingetSources
 
     if (-not $SkipBloatwareRemoval) {
-        Set-OverallProgress -Status (T 'PhaseBloatware') -Percent $pct.BloatStart
+        Set-OverallProgress -Status (T 'PhaseBloatware') -Percent $script:PhasePct.BloatStart
         Write-Log "=== $(T 'PhaseBloatware') ===" -Level 'SECTION'
         $bloatwarePatterns = @(
             'Copilot', 'Outlook', 'Quick Assist', 'Remote Desktop',
@@ -1036,27 +1047,27 @@ try {
         Remove-AppxPackages
         Remove-WindowsCapabilities
         Remove-McAfeeProducts
-        Set-OverallProgress -Status "$(T 'PhaseBloatware') - Complete" -Percent $pct.BloatEnd
+        Set-OverallProgress -Status "$(T 'PhaseBloatware') - Complete" -Percent $script:PhasePct.BloatEnd
         Write-Log "=== $(T 'PhaseBloatware') COMPLETE ===" -Level 'SUCCESS'
     } else {
         Write-Log (T 'SkipBloatware')
     }
 
     if (-not $SkipAppInstall) {
-        Set-OverallProgress -Status (T 'PhaseApps') -Percent $pct.AppsStart
+        Set-OverallProgress -Status (T 'PhaseApps') -Percent $script:PhasePct.AppsStart
         Write-Log "=== $(T 'PhaseApps') ===" -Level 'SECTION'
         Install-StandardApps
-        Set-OverallProgress -Status "$(T 'PhaseApps') - Complete" -Percent $pct.AppsEnd
+        Set-OverallProgress -Status "$(T 'PhaseApps') - Complete" -Percent $script:PhasePct.AppsEnd
         Write-Log "=== $(T 'PhaseApps') COMPLETE ===" -Level 'SUCCESS'
     } else {
         Write-Log (T 'SkipApps')
     }
 
     if (-not $SkipSystemConfig) {
-        Set-OverallProgress -Status (T 'PhaseConfig') -Percent $pct.ConfigStart
+        Set-OverallProgress -Status (T 'PhaseConfig') -Percent $script:PhasePct.ConfigStart
         Write-Log "=== $(T 'PhaseConfig') ===" -Level 'SECTION'
         Set-SystemConfiguration
-        Set-OverallProgress -Status "$(T 'PhaseConfig') - Complete" -Percent $pct.ConfigEnd
+        Set-OverallProgress -Status "$(T 'PhaseConfig') - Complete" -Percent $script:PhasePct.ConfigEnd
         Write-Log "=== $(T 'PhaseConfig') COMPLETE ===" -Level 'SUCCESS'
     } else {
         Write-Log (T 'SkipConfig')
@@ -1070,12 +1081,8 @@ try {
         'SUCCESS'
     }
 
-    Set-OverallProgress -Status (T 'PhaseReporting') -Percent $pct.ConfigEnd
+    Set-OverallProgress -Status (T 'PhaseReporting') -Percent $script:PhasePct.ConfigEnd
     Export-HtmlReport -OverallStatus $overallStatus
-
-    # Clear both progress bars cleanly
-    Write-Progress -Id 1 -Activity ' ' -Completed
-    Write-Progress -Id 0 -Activity ' ' -Completed
 
     Write-Log "===== $(T 'Completed') =====" -Level 'SUCCESS'
     Write-Host "`n*** $(T 'SetupComplete') ***" -ForegroundColor Green
@@ -1086,11 +1093,12 @@ try {
 }
 catch {
     Write-Log "$(T 'CriticalError'): $($_.Exception.Message)" -Level 'ERROR'
-    try {
-        Write-Progress -Id 1 -Activity ' ' -Completed
-        Write-Progress -Id 0 -Activity ' ' -Completed
-        Export-HtmlReport -OverallStatus 'FAILED'
-    } catch {}
+    try { Export-HtmlReport -OverallStatus 'FAILED' } catch {}
     Write-Host "`n*** $(T 'SetupFailed'): $LogPath ***" -ForegroundColor Red
     exit 1
+}
+finally {
+    # Always clear progress bars — runs on success, failure, and Ctrl+C
+    Write-Progress -Id 1 -Activity ' ' -Completed
+    Write-Progress -Id 0 -Activity ' ' -Completed
 }
