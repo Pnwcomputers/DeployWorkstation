@@ -11,7 +11,7 @@
 
 A PowerShell-based, automated provisioning solution that transforms Windows 10 & 11 workstation deployment from a 30-step manual process into a single "plug-and-play" operation. Whether you're imaging bare metal or cleaning up an existing PC, DeployWorkstation handles the heavy lifting of bloatware removal and essential application installation.
 
-## 🆕 What's New in Version 5 (Q2 2026)
+## 🆕 What's New in Version5
 
 - 🔧 Improved App Removal & Installation
 - 🚀 Advanced Reporting
