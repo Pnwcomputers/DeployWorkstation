@@ -1,6 +1,6 @@
 # DeployWorkstation.ps1 – Optimized Win10/11 Setup & Clean-up
-# Version: 6.0 – PNWC Edition
-# New in 6.0: Write-Progress console bars, embedded en-US / es-ES localization
+# Version: 5.0 – PNWC Edition
+# New in 5.0: Write-Progress console bars, embedded en-US / es-ES localization
 
 #Requires -Version 5.1
 #Requires -RunAsAdministrator
