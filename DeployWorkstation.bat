@@ -55,6 +55,7 @@ echo   3. Install apps only
 echo   4. System configuration only
 echo   5. Exit
 echo.
+set "choice="
 set /p choice="Enter choice (1-5): "
 
 set "ps_params="
