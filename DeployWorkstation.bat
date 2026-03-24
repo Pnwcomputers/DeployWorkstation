@@ -79,7 +79,7 @@ if "%choice%"=="1" (
     echo Exiting.
     goto :normal_exit
 ) else (
-    echo [!] Invalid choice – please try again.
+    echo [!] Invalid choice - please try again.
     echo.
     goto :menu
 )
@@ -88,7 +88,7 @@ REM --------------------------------------------------------
 REM  5) Show what will run, then launch
 REM --------------------------------------------------------
 if "!ps_params!"=="" (
-    echo     Parameters : (none – full run)
+    echo     Parameters : (none - full run)
 ) else (
     echo     Parameters : !ps_params!
 )
