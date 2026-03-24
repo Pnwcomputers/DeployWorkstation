@@ -287,15 +287,16 @@ $script:Strings = @{
     }
 }
 
-# Resolve active language — match on primary culture tag, fall back to en-US
-$culture      = (Get-Culture).Name                                  # e.g. 'es-ES', 'en-US'
-$primaryTag   = $culture.Split('-')[0]                              # e.g. 'es', 'en'
+# Resolve active language — exact match first, then primary tag, then en-US fallback
+$culture      = (Get-Culture).Name          # e.g. 'es-ES', 'en-US'
+$primaryTag   = $culture.Split('-')[0]      # e.g. 'es', 'en'
 $resolvedLang = if ($script:Strings.ContainsKey($culture)) {
                     $culture
-                } elseif ($script:Strings.Keys -match "^$primaryTag-") {
-                    ($script:Strings.Keys | Where-Object { $_ -match "^$primaryTag-" } | Select-Object -First 1)
                 } else {
-                    'en-US'
+                    $tagMatch = $script:Strings.Keys |
+                                Where-Object { $_ -match "^$primaryTag-" } |
+                                Select-Object -First 1
+                    if ($tagMatch) { $tagMatch } else { 'en-US' }
                 }
 $script:Lang  = $script:Strings[$resolvedLang]
 
@@ -812,12 +813,15 @@ function Export-HtmlReport {
     Set-PhaseProgress -Activity (T 'PhaseReporting') -Status (T 'ProgReportCollect') -Current 1 -Total 3
 
     $os          = Get-CimInstance Win32_OperatingSystem
-    $cpu         = (Get-CimInstance Win32_Processor | Select-Object -First 1).Name
+    $cpu         = ConvertTo-HtmlSafe (Get-CimInstance Win32_Processor | Select-Object -First 1).Name
+    $osCaption   = ConvertTo-HtmlSafe $os.Caption
     $ramGB       = [math]::Round($os.TotalVisibleMemorySize / 1MB, 1)
     $uptimeHrs   = [math]::Round(((Get-Date) - $os.LastBootUpTime).TotalHours, 1)
-    $duration    = (Get-Date) - $script:StartTime
-    $durationFmt = '{0:mm}m {0:ss}s' -f $duration
-    $timestamp   = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    $duration     = (Get-Date) - $script:StartTime
+    $durationMins = [int]$duration.TotalMinutes
+    $durationSecs = $duration.Seconds
+    $durationFmt  = "${durationMins}m ${durationSecs}s"
+    $timestamp    = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 
     Set-PhaseProgress -Activity (T 'PhaseReporting') -Status (T 'ProgReportBuild') -Current 2 -Total 3
 
@@ -938,7 +942,7 @@ function Export-HtmlReport {
 <h2>$lSysInfo</h2>
 <div class="info-grid">
   <div class="info-card"><div class="label">$lHostname</div><div class="value">$env:COMPUTERNAME</div></div>
-  <div class="info-card"><div class="label">$lOS</div><div class="value">$($os.Caption)</div></div>
+  <div class="info-card"><div class="label">$lOS</div><div class="value">$osCaption</div></div>
   <div class="info-card"><div class="label">$lCPU</div><div class="value">$cpu</div></div>
   <div class="info-card"><div class="label">$lRAM</div><div class="value">$ramGB GB</div></div>
   <div class="info-card"><div class="label">$lUptime</div><div class="value">$uptimeHrs $lHrs</div></div>
