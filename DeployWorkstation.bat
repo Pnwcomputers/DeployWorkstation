@@ -2,7 +2,7 @@
 REM ========================================================
 REM  DeployWorkstation.bat
 REM  Launcher for DeployWorkstation.ps1
-REM  Version 6.0 – PNWC Edition
+REM  Version 5.0 – PNWC Edition
 REM ========================================================
 
 setlocal enabledelayedexpansion
