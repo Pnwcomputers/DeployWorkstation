@@ -1,27 +1,20 @@
 @echo off
-REM ========================================================
-REM  DeployWorkstation.bat
-REM  Launcher for DeployWorkstation.ps1
-REM  Version 5.1 – PNWC Edition
-REM ========================================================
-
-setlocal enabledelayedexpansion
+setlocal EnableExtensions EnableDelayedExpansion
 
 echo.
-echo ===== DeployWorkstation Launcher v5.1 =====
+echo ===== DeployWorkstation Launcher v5.2 =====
 echo.
 
 REM --------------------------------------------------------
 REM  1) Elevation check
-REM     Re-launch this .bat elevated if not already admin.
 REM --------------------------------------------------------
 net session >nul 2>&1
-if %errorlevel% neq 0 (
+if errorlevel 1 (
     echo Requesting administrative privileges...
     echo Please click "Yes" in the UAC prompt.
     echo.
-    powershell.exe -NoProfile -Command ^
-        "Start-Process -FilePath '%~f0' -Verb RunAs -Wait"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
+        "Start-Process -FilePath '%~f0' -Verb RunAs"
     exit /b
 )
 
@@ -29,14 +22,18 @@ echo [OK] Running as Administrator.
 echo.
 
 REM --------------------------------------------------------
-REM  2) Change to the directory containing this .bat
+REM  2) Change to script directory
 REM --------------------------------------------------------
-pushd "%~dp0"
+pushd "%~dp0" || (
+    echo [ERROR] Failed to access script folder.
+    pause
+    exit /b 1
+)
 
 REM --------------------------------------------------------
-REM  3) Verify the PowerShell script is present
+REM  3) Verify PowerShell script exists
 REM --------------------------------------------------------
-if not exist "DeployWorkstation.ps1" (
+if not exist "%~dp0DeployWorkstation.ps1" (
     echo [ERROR] DeployWorkstation.ps1 not found.
     echo         Expected: %~dp0DeployWorkstation.ps1
     echo.
@@ -56,7 +53,7 @@ echo   4. System configuration only
 echo   5. Exit
 echo.
 set "choice="
-set /p choice="Enter choice (1-5): "
+set /p "choice=Enter choice (1-5): "
 
 set "ps_params="
 
@@ -76,7 +73,7 @@ if "%choice%"=="1" (
     echo [*] System configuration only.
     set "ps_params=-SkipBloatwareRemoval -SkipAppInstall"
 ) else if "%choice%"=="5" (
-    echo Exiting.
+    set "ps_exit=0"
     goto :normal_exit
 ) else (
     echo [!] Invalid choice - please try again.
@@ -87,22 +84,17 @@ if "%choice%"=="1" (
 REM --------------------------------------------------------
 REM  5) Show what will run, then launch
 REM --------------------------------------------------------
-if "!ps_params!"=="" (
-    echo     Parameters : (none - full run)
-) else (
+echo.
+if defined ps_params (
     echo     Parameters : !ps_params!
+) else (
+    echo     Parameters : (none - full run)
 )
 echo.
 echo Starting Windows PowerShell 5.1...
 echo.
 
-if "!ps_params!"=="" (
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "DeployWorkstation.ps1"
-) else (
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "DeployWorkstation.ps1" !ps_params!
-)
-
-REM Capture exit code immediately before anything can overwrite it
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1" !ps_params!
 set "ps_exit=%errorlevel%"
 
 REM --------------------------------------------------------
@@ -119,18 +111,14 @@ if "%ps_exit%"=="0" (
 
 goto :normal_exit
 
-REM --------------------------------------------------------
 :error_exit
 echo.
 echo ===== Launch aborted =====
-popd
-pause
-exit /b 1
+set "ps_exit=1"
 
-REM --------------------------------------------------------
 :normal_exit
 popd
 echo.
 echo Press any key to close...
 pause >nul
-exit /b 0
+exit /b %ps_exit%
