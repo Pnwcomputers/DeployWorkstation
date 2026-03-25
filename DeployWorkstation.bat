@@ -2,121 +2,44 @@
 setlocal EnableExtensions EnableDelayedExpansion
 
 echo.
-echo ===== DeployWorkstation Launcher v5.1 =====
+echo ===== DeployWorkstation Launcher v6.0 =====
 echo.
 
-REM --------------------------------------------------------
-REM  1) Elevation check
-REM --------------------------------------------------------
+rem Relaunch elevated if needed
 net session >nul 2>&1
 if errorlevel 1 (
     echo Requesting administrative privileges...
-    echo Please click "Yes" in the UAC prompt.
-    echo.
     powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
         "Start-Process -FilePath '%~f0' -Verb RunAs"
     exit /b
 )
 
-echo [OK] Running as Administrator.
-echo.
-
-REM --------------------------------------------------------
-REM  2) Change to script directory
-REM --------------------------------------------------------
 pushd "%~dp0" || (
-    echo [ERROR] Failed to access script folder.
+    echo [ERROR] Could not access script folder.
     pause
     exit /b 1
 )
 
-REM --------------------------------------------------------
-REM  3) Verify PowerShell script exists
-REM --------------------------------------------------------
 if not exist "%~dp0DeployWorkstation.ps1" (
     echo [ERROR] DeployWorkstation.ps1 not found.
-    echo         Expected: %~dp0DeployWorkstation.ps1
-    echo.
-    goto :error_exit
+    echo Expected: %~dp0DeployWorkstation.ps1
+    set "ps_exit=1"
+    goto :done
 )
 
-REM --------------------------------------------------------
-REM  4) Menu
-REM --------------------------------------------------------
-:menu
-echo Select deployment mode:
-echo.
-echo   1. Full deployment  (remove bloatware + install apps + configure system)
-echo   2. Remove bloatware only
-echo   3. Install apps only
-echo   4. System configuration only
-echo   5. Exit
-echo.
-set "choice="
-set /p "choice=Enter choice (1-5): "
-
-set "ps_params="
-
-if "%choice%"=="1" (
-    echo.
-    echo [*] Full deployment selected.
-) else if "%choice%"=="2" (
-    echo.
-    echo [*] Bloatware removal only.
-    set "ps_params=-SkipAppInstall -SkipSystemConfig"
-) else if "%choice%"=="3" (
-    echo.
-    echo [*] App installation only.
-    set "ps_params=-SkipBloatwareRemoval -SkipSystemConfig"
-) else if "%choice%"=="4" (
-    echo.
-    echo [*] System configuration only.
-    set "ps_params=-SkipBloatwareRemoval -SkipAppInstall"
-) else if "%choice%"=="5" (
-    set "ps_exit=0"
-    goto :normal_exit
-) else (
-    echo [!] Invalid choice - please try again.
-    echo.
-    goto :menu
-)
-
-REM --------------------------------------------------------
-REM  5) Show what will run, then launch
-REM --------------------------------------------------------
-echo.
-if defined ps_params (
-    echo     Parameters : !ps_params!
-) else (
-    echo     Parameters : (none - full run)
-)
-echo.
-echo Starting Windows PowerShell 5.1...
-echo.
-
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1" !ps_params!
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1"
 set "ps_exit=%errorlevel%"
 
-REM --------------------------------------------------------
-REM  6) Result
-REM --------------------------------------------------------
 echo.
 if "%ps_exit%"=="0" (
     echo ===== Deployment completed successfully =====
 ) else (
-    echo ===== Deployment finished with errors =====
-    echo     Exit code : %ps_exit%
-    echo     Check DeployWorkstation.log in this folder for details.
+    echo ===== Deployment completed with warnings or errors =====
+    echo Exit code: %ps_exit%
+    echo Review DeployWorkstation.log and DeployWorkstation.html in this folder.
 )
 
-goto :normal_exit
-
-:error_exit
-echo.
-echo ===== Launch aborted =====
-set "ps_exit=1"
-
-:normal_exit
+:done
 popd
 echo.
 echo Press any key to close...
