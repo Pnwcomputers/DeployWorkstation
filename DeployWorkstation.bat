@@ -2,7 +2,7 @@
 setlocal EnableExtensions EnableDelayedExpansion
 
 echo.
-echo ===== DeployWorkstation Launcher v5.2 =====
+echo ===== DeployWorkstation Launcher v5.1 =====
 echo.
 
 REM --------------------------------------------------------
