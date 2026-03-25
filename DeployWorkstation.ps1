@@ -1023,7 +1023,7 @@ function Export-HtmlReport {
             '\bEnterprise\b' { 'Enterprise'  }
             '\bEducation\b'  { 'Education'   }
             '\bServer\b'     { 'Server'      }
-            default          { '—'           }
+            default          { 'Unknown'     }
         }
     )
     $osBuild     = $script:OsBuild
