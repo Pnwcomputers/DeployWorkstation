@@ -1,10 +1,7 @@
 # DeployWorkstation.ps1 – Optimized Win10/11 Setup & Clean-up
 # Version: 5.1 – PNWC Edition
-# Based on v5.0 with minimal fixes:
-# - Fixed Set-RegistryValue for Windows PowerShell 5.1
-# - Added safe Windows edition/build detection
-# - Added edition/build to HTML report
-# - Preserved original structure and behavior as much as possible
+# New in 5.0: Write-Progress console bars, embedded en-US / es-ES localization
+# New in 5.1: Winget auto-bootstrap, install retry logic, WU guard, OEM OneDrive, edition awareness
 
 #Requires -Version 5.1
 #Requires -RunAsAdministrator
@@ -23,24 +20,23 @@ param(
 # ================================
 
 $ErrorActionPreference = 'Continue'
-$ProgressPreference    = 'Continue'
+$ProgressPreference    = 'Continue'          # Must be Continue for Write-Progress to render
 $script:StartTime      = Get-Date
-$script:Version        = '5.1'
 
+# $PSScriptRoot is read-only in PS5.1 — use a separate variable for fallback safety
 $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 
 if (-not $LogPath)    { $LogPath    = Join-Path $scriptRoot 'DeployWorkstation.log'  }
 if (-not $ReportPath) { $ReportPath = Join-Path $scriptRoot 'DeployWorkstation.html' }
 
+# --------------------------------
+# Restart in Windows PowerShell 5.1 if running under PS Core
+# --------------------------------
 if ($PSVersionTable.PSEdition -eq 'Core') {
     Write-Warning 'PowerShell Core detected. Restarting in Windows PowerShell 5.1...'
-    $params = @(
-        '-NoProfile',
-        '-ExecutionPolicy', 'Bypass',
-        '-File', "`"$PSCommandPath`"",
-        '-LogPath', "`"$LogPath`"",
-        '-ReportPath', "`"$ReportPath`""
-    )
+    # Wrap path values in escaped quotes so spaces in paths survive Start-Process argument joining
+    $params = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"",
+                '-LogPath', "`"$LogPath`"", '-ReportPath', "`"$ReportPath`"")
     if ($SkipAppInstall)       { $params += '-SkipAppInstall' }
     if ($SkipBloatwareRemoval) { $params += '-SkipBloatwareRemoval' }
     if ($SkipSystemConfig)     { $params += '-SkipSystemConfig' }
@@ -51,10 +47,14 @@ if ($PSVersionTable.PSEdition -eq 'Core') {
 # ================================
 # Localization
 # ================================
+# Auto-detected from Get-Culture, falls back to en-US.
+# To add a new language: copy the en-US block, change the key, translate the values.
+# Progress bars, log messages, summary labels, and HTML report headings are all localized.
 
 $script:Strings = @{
 
     'en-US' = @{
+        # Startup
         Started           = 'DeployWorkstation v5.1 Started'
         WingetRequired    = "Winget is required. Install 'App Installer' from the Microsoft Store."
         WingetFound       = 'Winget found'
@@ -65,15 +65,18 @@ $script:Strings = @{
         RefreshingSources = 'Refreshing winget source index'
         SourcesFailed     = 'Could not manage winget sources'
 
+        # Phase names (console + progress bar)
         PhaseBloatware    = 'BLOATWARE REMOVAL'
         PhaseApps         = 'APP INSTALLATION'
         PhaseConfig       = 'SYSTEM CONFIGURATION'
         PhaseReporting    = 'GENERATING REPORT'
 
+        # Skip messages
         SkipBloatware     = 'Bloatware removal skipped (-SkipBloatwareRemoval).'
         SkipApps          = 'App installation skipped (-SkipAppInstall).'
         SkipConfig        = 'System configuration skipped (-SkipSystemConfig).'
 
+        # Progress bar activity labels
         ProgOverall       = 'Deploying Workstation'
         ProgBloatware     = 'Removing Bloatware'
         ProgAppx          = 'Removing Appx Packages'
@@ -82,6 +85,7 @@ $script:Strings = @{
         ProgApps          = 'Installing Applications'
         ProgConfig        = 'Configuring System'
 
+        # Item-level actions / outcomes
         Checking          = 'Checking'
         NotFound          = 'Not found'
         Removing          = 'Removing'
@@ -108,6 +112,7 @@ $script:Strings = @{
         RegistryFail      = 'Registry FAIL'
         SysConfigDone     = 'System configuration complete.'
 
+        # Summary labels
         SumTitle          = 'DEPLOYMENT SUMMARY'
         SumAppsOK         = 'Apps installed / skipped'
         SumAppsFail       = 'Apps failed'
@@ -117,6 +122,7 @@ $script:Strings = @{
         SumConfigFail     = 'Config keys failed'
         SumMcAfee         = 'McAfee products removed'
 
+        # Completion
         Completed         = 'DeployWorkstation.ps1 Completed'
         SetupComplete     = 'Setup complete!'
         SetupFailed       = 'Setup failed - see log'
@@ -125,6 +131,28 @@ $script:Strings = @{
         ReportFail        = 'Failed to write HTML report'
         CriticalError     = 'CRITICAL ERROR'
 
+        # Winget bootstrap
+        WingetOld         = 'Winget outdated, updating'
+        WingetBootstrap   = 'Installing App Installer (winget)'
+        WingetBootOK      = 'App Installer installed successfully'
+        WingetBootFail    = 'Failed to install App Installer'
+        WingetReRegister  = 'Attempting package re-registration'
+        WingetDownload    = 'Downloading App Installer from Microsoft'
+
+        # Reliability
+        InstallRetrying   = 'Network error, retrying'
+        CapWuUnavail      = 'Skipped - Windows Update not accessible on this system'
+        HomeEditionNote   = 'Policy key written but has no effect on Windows Home edition'
+        OneDriveOem       = 'OneDrive OEM binary removal'
+        OneDriveOemFound  = 'Found OEM OneDrive binary'
+        OneDriveOemDone   = 'OEM OneDrive uninstall completed'
+        OneDriveOemNone   = 'No OEM OneDrive setup binary found'
+
+        # HTML report additions
+        HtmlEdition       = 'Edition'
+        HtmlBuild         = 'Build'
+
+        # Progress — winget init & report steps
         ProgWingetCheck   = 'Checking Winget'
         ProgSourcesList   = 'Listing sources'
         ProgSourcesUpdate = 'Updating sources'
@@ -132,6 +160,7 @@ $script:Strings = @{
         ProgReportBuild   = 'Building report'
         ProgReportWrite   = 'Writing report file'
 
+        # HTML report headings
         HtmlTitle         = 'DeployWorkstation Report'
         HtmlGenerated     = 'Generated'
         HtmlSysInfo       = 'System Information'
@@ -140,8 +169,6 @@ $script:Strings = @{
         HtmlEventLog      = 'Full Event Log (last 200 entries)'
         HtmlHostname      = 'Hostname'
         HtmlOS            = 'Operating System'
-        HtmlEdition       = 'Edition'
-        HtmlBuild         = 'Build'
         HtmlCPU           = 'CPU'
         HtmlRAM           = 'RAM'
         HtmlUptime        = 'System Uptime'
@@ -165,6 +192,7 @@ $script:Strings = @{
     }
 
     'es-ES' = @{
+        # Startup
         Started           = 'DeployWorkstation v5.1 Iniciado'
         WingetRequired    = "Se requiere Winget. Instale 'App Installer' desde Microsoft Store."
         WingetFound       = 'Winget encontrado'
@@ -175,15 +203,18 @@ $script:Strings = @{
         RefreshingSources = 'Actualizando indice de fuentes winget'
         SourcesFailed     = 'No se pudieron administrar las fuentes de winget'
 
+        # Phase names
         PhaseBloatware    = 'ELIMINACION DE SOFTWARE NO DESEADO'
         PhaseApps         = 'INSTALACION DE APLICACIONES'
         PhaseConfig       = 'CONFIGURACION DEL SISTEMA'
         PhaseReporting    = 'GENERANDO INFORME'
 
+        # Skip messages
         SkipBloatware     = 'Eliminacion de software omitida (-SkipBloatwareRemoval).'
         SkipApps          = 'Instalacion de aplicaciones omitida (-SkipAppInstall).'
         SkipConfig        = 'Configuracion del sistema omitida (-SkipSystemConfig).'
 
+        # Progress bar activity labels
         ProgOverall       = 'Configurando Estacion de Trabajo'
         ProgBloatware     = 'Eliminando Software No Deseado'
         ProgAppx          = 'Eliminando Paquetes Appx'
@@ -192,6 +223,7 @@ $script:Strings = @{
         ProgApps          = 'Instalando Aplicaciones'
         ProgConfig        = 'Configurando Sistema'
 
+        # Item-level actions / outcomes
         Checking          = 'Verificando'
         NotFound          = 'No encontrado'
         Removing          = 'Eliminando'
@@ -218,6 +250,7 @@ $script:Strings = @{
         RegistryFail      = 'Fallo de registro'
         SysConfigDone     = 'Configuracion del sistema completada.'
 
+        # Summary labels
         SumTitle          = 'RESUMEN DE DESPLIEGUE'
         SumAppsOK         = 'Aplicaciones instaladas / omitidas'
         SumAppsFail       = 'Aplicaciones fallidas'
@@ -227,6 +260,7 @@ $script:Strings = @{
         SumConfigFail     = 'Claves de configuracion fallidas'
         SumMcAfee         = 'Productos McAfee eliminados'
 
+        # Completion
         Completed         = 'DeployWorkstation.ps1 Completado'
         SetupComplete     = 'Configuracion completada!'
         SetupFailed       = 'Configuracion fallida - ver registro'
@@ -235,6 +269,28 @@ $script:Strings = @{
         ReportFail        = 'Error al escribir el informe HTML'
         CriticalError     = 'ERROR CRITICO'
 
+        # Winget bootstrap
+        WingetOld         = 'Winget desactualizado, actualizando'
+        WingetBootstrap   = 'Instalando App Installer (winget)'
+        WingetBootOK      = 'App Installer instalado exitosamente'
+        WingetBootFail    = 'Error al instalar App Installer'
+        WingetReRegister  = 'Intentando re-registro del paquete'
+        WingetDownload    = 'Descargando App Installer de Microsoft'
+
+        # Reliability
+        InstallRetrying   = 'Error de red, reintentando'
+        CapWuUnavail      = 'Omitido - Windows Update no accesible en este sistema'
+        HomeEditionNote   = 'Clave de politica escrita pero sin efecto en Windows Home'
+        OneDriveOem       = 'Eliminacion de OneDrive OEM'
+        OneDriveOemFound  = 'Binario OEM de OneDrive encontrado'
+        OneDriveOemDone   = 'Desinstalacion de OneDrive OEM completada'
+        OneDriveOemNone   = 'No se encontro binario de configuracion de OneDrive OEM'
+
+        # HTML report additions
+        HtmlEdition       = 'Edicion'
+        HtmlBuild         = 'Version de Compilacion'
+
+        # Progress — winget init & report steps
         ProgWingetCheck   = 'Verificando Winget'
         ProgSourcesList   = 'Listando fuentes'
         ProgSourcesUpdate = 'Actualizando fuentes'
@@ -242,6 +298,7 @@ $script:Strings = @{
         ProgReportBuild   = 'Construyendo informe'
         ProgReportWrite   = 'Escribiendo archivo de informe'
 
+        # HTML report headings
         HtmlTitle         = 'Informe de DeployWorkstation'
         HtmlGenerated     = 'Generado'
         HtmlSysInfo       = 'Informacion del Sistema'
@@ -250,8 +307,6 @@ $script:Strings = @{
         HtmlEventLog      = 'Registro de Eventos (ultimas 200 entradas)'
         HtmlHostname      = 'Nombre de Host'
         HtmlOS            = 'Sistema Operativo'
-        HtmlEdition       = 'Edicion'
-        HtmlBuild         = 'Compilacion'
         HtmlCPU           = 'Procesador'
         HtmlRAM           = 'Memoria RAM'
         HtmlUptime        = 'Tiempo de Actividad'
@@ -275,22 +330,28 @@ $script:Strings = @{
     }
 }
 
-$culture      = (Get-Culture).Name
-$primaryTag   = $culture.Split('-')[0]
+# Resolve active language — exact match first, then primary tag, then en-US fallback
+$culture      = (Get-Culture).Name          # e.g. 'es-ES', 'en-US'
+$primaryTag   = $culture.Split('-')[0]      # e.g. 'es', 'en'
 $resolvedLang = if ($script:Strings.ContainsKey($culture)) {
-    $culture
-} else {
-    $tagMatch = $script:Strings.Keys | Where-Object { $_ -match "^$primaryTag-" } | Select-Object -First 1
-    if ($tagMatch) { $tagMatch } else { 'en-US' }
-}
+                    $culture
+                } else {
+                    $tagMatch = $script:Strings.Keys |
+                                Where-Object { $_ -match "^$primaryTag-" } |
+                                Select-Object -First 1
+                    if ($tagMatch) { $tagMatch } else { 'en-US' }
+                }
 $script:Lang  = $script:Strings[$resolvedLang]
 
+# T() — short translate helper used throughout the script
 function T {
     param([string]$Key)
     if ($script:Lang.ContainsKey($Key)) { return $script:Lang[$Key] }
-    return $Key
+    return $Key   # fall back to the key name itself if missing
 }
 
+# ConvertTo-HtmlSafe — encodes special chars so exception messages / paths
+# don't break the HTML report structure
 function ConvertTo-HtmlSafe {
     param([string]$Text)
     if (-not $Text) { return '' }
@@ -324,7 +385,6 @@ function Write-Log {
         'SECTION' { 'Cyan'   }
         default   { 'Gray'   }
     }
-
     Write-Host $logEntry -ForegroundColor $color
     Add-Content -Path $LogPath -Value $logEntry -Encoding UTF8
     $script:EventLog.Add(@{ Timestamp = $timestamp; Level = $Level; Message = $Message })
@@ -333,11 +393,14 @@ function Write-Log {
 # ================================
 # Progress Bar Helpers
 # ================================
+# Two-tier layout:
+#   ID 0 — overall deployment (phases, shown as % complete)
+#   ID 1 — current phase items (child bar, shown as current item name)
 
 function Set-OverallProgress {
     param(
         [string]$Status,
-        [int]$Percent
+        [int]   $Percent
     )
     Write-Progress -Id 0 -Activity (T 'ProgOverall') -Status $Status -PercentComplete $Percent
 }
@@ -346,8 +409,8 @@ function Set-PhaseProgress {
     param(
         [string]$Activity,
         [string]$Status,
-        [int]$Current,
-        [int]$Total
+        [int]   $Current,
+        [int]   $Total
     )
     $pct = if ($Total -gt 0) { [int](($Current / $Total) * 100) } else { 0 }
     Write-Progress -Id 1 -ParentId 0 -Activity $Activity -Status $Status -PercentComplete $pct
@@ -391,21 +454,15 @@ function Add-Result {
 
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 
-# Safe OS/edition/build detection
+# Cache OS info once — used for edition-aware behavior throughout the script
 $script:OsInfo  = Get-CimInstance Win32_OperatingSystem
 $script:OsBuild = [int]$script:OsInfo.BuildNumber
-
-try {
-    $script:EditionId = [string](Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -Name EditionID -ErrorAction Stop).EditionID
-} catch {
-    $script:EditionId = 'Unknown'
-}
+$script:IsHome  = $script:OsInfo.Caption -match '\bHome\b'
+$script:IsWin11 = $script:OsBuild -ge 22000
 
 Write-Log "===== $(T 'Started') =====" -Level 'SECTION'
 Write-Log "PowerShell  : $($PSVersionTable.PSVersion)"
-Write-Log "OS          : $($script:OsInfo.Caption)"
-Write-Log "Edition     : $($script:EditionId)"
-Write-Log "Build       : $($script:OsBuild)"
+Write-Log "OS          : $($script:OsInfo.Caption) (Build $script:OsBuild)"
 Write-Log "Hostname    : $env:COMPUTERNAME"
 Write-Log "Language    : $resolvedLang"
 Write-Log "Log file    : $LogPath"
@@ -419,20 +476,11 @@ function Set-RegistryValue {
     param(
         [string]$Path,
         [string]$Name,
-        [int]$Value
+        [int]   $Value
     )
     try {
-        if (-not (Test-Path $Path)) {
-            New-Item -Path $Path -Force | Out-Null
-        }
-
-        $existing = Get-ItemProperty -Path $Path -Name $Name -ErrorAction SilentlyContinue
-        if ($null -eq $existing) {
-            New-ItemProperty -Path $Path -Name $Name -Value $Value -PropertyType DWord -Force -ErrorAction Stop | Out-Null
-        } else {
-            Set-ItemProperty -Path $Path -Name $Name -Value $Value -Force -ErrorAction Stop
-        }
-
+        if (-not (Test-Path $Path)) { New-Item -Path $Path -Force | Out-Null }
+        Set-ItemProperty -Path $Path -Name $Name -Value $Value -Type DWord -Force -ErrorAction Stop
         Write-Log "$(T 'RegistryOK'): $Path\$Name = $Value" -Level 'SUCCESS'
         Add-Result -Section (T 'PhaseConfig') -Item $Name -Status 'OK' -Detail "$Path = $Value"
         $script:Summary.HardeningApplied++
@@ -448,19 +496,86 @@ function Set-RegistryValue {
 # Winget Management
 # ================================
 
-function Test-Winget {
-    Set-PhaseProgress -Activity (T 'ProgWingetCheck') -Status (T 'Checking') -Current 1 -Total 1
+function Install-WingetIfNeeded {
+    # Minimum usable winget version (supports --source winget, --accept-source-agreements)
+    $minVersion = [Version]'1.2.0'
+
+    Set-PhaseProgress -Activity (T 'ProgWingetCheck') -Status (T 'Checking') -Current 1 -Total 3
+
+    # --- Check existing winget ---
+    $needsInstall = $false
+    $wingetCmd    = Get-Command winget -ErrorAction SilentlyContinue
+
+    if (-not $wingetCmd) {
+        Write-Log (T 'WingetMissing') -Level 'WARN'
+        $needsInstall = $true
+    } else {
+        $rawVer = (winget --version 2>$null) -replace '[^\d\.]', ''
+        try {
+            if ([Version]$rawVer -lt $minVersion) {
+                Write-Log "$(T 'WingetOld'): v$rawVer (minimum $minVersion)" -Level 'WARN'
+                $needsInstall = $true
+            } else {
+                Write-Log "$(T 'WingetFound'): v$rawVer"
+            }
+        }
+        catch {
+            # Version string unparseable — assume it is adequate and continue
+            Write-Log "$(T 'WingetFound'): $rawVer"
+        }
+    }
+
+    if (-not $needsInstall) {
+        Clear-PhaseProgress
+        return $true
+    }
+
+    # --- Bootstrap Step 1: re-register existing package (works on most OEM builds) ---
+    Write-Log "$(T 'WingetBootstrap')..." -Level 'SECTION'
+    Set-PhaseProgress -Activity (T 'ProgWingetCheck') -Status (T 'WingetReRegister') -Current 2 -Total 3
+
     try {
+        Write-Log (T 'WingetReRegister')
+        Add-AppxPackage -RegisterByFamilyName -MainPackage 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe' -ErrorAction Stop
+        Start-Sleep -Seconds 3
         $null = Get-Command winget -ErrorAction Stop
-        $version = (winget --version) -replace '[^\d\.]', ''
-        Write-Log "$(T 'WingetFound'): v$version"
+        Write-Log (T 'WingetBootOK') -Level 'SUCCESS'
         Clear-PhaseProgress
         return $true
     }
     catch {
-        Write-Log (T 'WingetMissing') -Level 'ERROR'
+        Write-Log "Re-registration failed: $($_.Exception.Message)" -Level 'WARN'
+    }
+
+    # --- Bootstrap Step 2: download MSIX bundle from Microsoft ---
+    Set-PhaseProgress -Activity (T 'ProgWingetCheck') -Status (T 'WingetDownload') -Current 3 -Total 3
+    $tempPath = Join-Path $env:TEMP 'AppInstaller.msixbundle'
+
+    try {
+        Write-Log (T 'WingetDownload')
+
+        # Prefer BITS (handles resume on slow/interrupted connections); fall back to WebClient
+        if (Get-Command Start-BitsTransfer -ErrorAction SilentlyContinue) {
+            Start-BitsTransfer -Source 'https://aka.ms/getwinget' -Destination $tempPath -ErrorAction Stop
+        } else {
+            (New-Object System.Net.WebClient).DownloadFile('https://aka.ms/getwinget', $tempPath)
+        }
+
+        Add-AppxPackage -Path $tempPath -ErrorAction Stop
+        Start-Sleep -Seconds 3
+        $null = Get-Command winget -ErrorAction Stop
+
+        Write-Log (T 'WingetBootOK') -Level 'SUCCESS'
         Clear-PhaseProgress
+        return $true
+    }
+    catch {
+        Write-Log "$(T 'WingetBootFail'): $($_.Exception.Message)" -Level 'ERROR'
         return $false
+    }
+    finally {
+        Remove-Item $tempPath -Force -ErrorAction SilentlyContinue
+        Clear-PhaseProgress
     }
 }
 
@@ -471,6 +586,7 @@ function Initialize-WingetSources {
         $sources = winget source list 2>$null
 
         if ($sources -match 'msstore') {
+            # msstore present — extend to 3 steps
             Set-PhaseProgress -Activity (T 'ProgSources') -Status (T 'RemovingMsstore') -Current 2 -Total 3
             Write-Log (T 'RemovingMsstore')
             winget source remove --name msstore 2>$null | Out-Null
@@ -503,7 +619,9 @@ function Remove-WingetApps {
 
     foreach ($pattern in $AppPatterns) {
         $current++
-        Set-PhaseProgress -Activity (T 'ProgBloatware') -Status "$(T 'Checking'): $pattern" -Current $current -Total $total
+        Set-PhaseProgress -Activity (T 'ProgBloatware') `
+                          -Status   "$(T 'Checking'): $pattern" `
+                          -Current  $current -Total $total
 
         Write-Log "$(T 'Checking'): $pattern"
         try {
@@ -516,7 +634,10 @@ function Remove-WingetApps {
                 continue
             }
 
-            Set-PhaseProgress -Activity (T 'ProgBloatware') -Status "$(T 'Removing'): $pattern" -Current $current -Total $total
+            Set-PhaseProgress -Activity (T 'ProgBloatware') `
+                              -Status   "$(T 'Removing'): $pattern" `
+                              -Current  $current -Total $total
+
             winget uninstall --name "$pattern" --silent --force --accept-source-agreements 2>&1 | Out-Null
 
             if ($LASTEXITCODE -eq 0) {
@@ -577,7 +698,7 @@ function Remove-AppxPackages {
                         Where-Object { $_.DisplayName -like $pattern }
             foreach ($pkg in $provPkgs) {
                 Write-Log "$(T 'AppxProvRemoving'): $($pkg.DisplayName)"
-                Remove-AppxProvisionedPackage -Online -PackageName $pkg.PackageName -ErrorAction SilentlyContinue | Out-Null
+                Remove-AppxProvisionedPackage -Online -PackageName $pkg.PackageName -ErrorAction SilentlyContinue
                 $script:Summary.AppxRemoved++
                 $removed++
             }
@@ -605,6 +726,21 @@ function Remove-WindowsCapabilities {
         'App.XboxSpeechToTextOverlay~~~~0.0.1.0',
         'OpenSSH.Client~~~~0.0.1.0'
     )
+
+    # Get-WindowsCapability requires Windows Update to be accessible.
+    # On Home with metered connections, WSUS-redirected builds, or disabled WU it returns
+    # $null silently and produces misleading SKIPPED results — guard against that.
+    $wuSvc = Get-Service -Name wuauserv -ErrorAction SilentlyContinue
+    $wuAccessible = $wuSvc -and $wuSvc.StartType -ne 'Disabled'
+
+    if (-not $wuAccessible) {
+        Write-Log (T 'CapWuUnavail') -Level 'WARN'
+        foreach ($cap in $capabilitiesToRemove) {
+            Add-Result -Section (T 'ProgCaps') -Item $cap -Status 'SKIPPED' -Detail (T 'CapWuUnavail')
+        }
+        Clear-PhaseProgress
+        return
+    }
 
     $total   = $capabilitiesToRemove.Count
     $current = 0
@@ -682,7 +818,6 @@ function Remove-McAfeeProducts {
                 $exe           = $parts[0]
                 $uninstallArgs = if ($parts.Length -gt 1) { $parts[1] } else { '' }
             }
-
             if ($uninstallArgs -notmatch '/S|/silent|/quiet') { $uninstallArgs += ' /S /quiet' }
 
             Write-Log "$(T 'McAfeeUninstall'): $displayName"
@@ -707,21 +842,39 @@ function Remove-McAfeeProducts {
 function Install-StandardApps {
     Write-Log "--- $(T 'ProgApps') ---" -Level 'SECTION'
 
-    $alreadyInstalledCode = -1978335189
+    $alreadyInstalledCode = -1978335189   # winget 0x8A15002B
+
+    # Winget exit codes that indicate a transient network problem — worth retrying
+    $networkErrorCodes = @(
+        -1978334967,  # 0x8A150109  winget download failed
+        -1978334966,  # 0x8A15010A  winget network timeout
+        -2147012887,  # 0x80072EE9  connection reset by peer
+        -2147012873,  # 0x80072EF7  DNS name not resolved
+        -2147012867   # 0x80072EFD  connection refused
+    )
+    $maxRetries   = 2
+    $retryDelaySec = 10
 
     $appsToInstall = @(
+        # ---- Security & Maintenance ----
         @{ Id = 'Malwarebytes.Malwarebytes';          Name = 'Malwarebytes'                  },
         @{ Id = 'BleachBit.BleachBit';                Name = 'BleachBit'                     },
+
+        # ---- Browsers & Productivity ----
         @{ Id = 'Google.Chrome';                      Name = 'Google Chrome'                 },
         @{ Id = 'Adobe.Acrobat.Reader.64-bit';        Name = 'Adobe Acrobat Reader (64-bit)' },
         @{ Id = '7zip.7zip';                          Name = '7-Zip'                         },
         @{ Id = 'VideoLAN.VLC';                       Name = 'VLC Media Player'              },
+
+        # ---- .NET Runtimes ----
         @{ Id = 'Microsoft.DotNet.Framework.4.8';     Name = '.NET Framework 4.8'            },
         @{ Id = 'Microsoft.DotNet.DesktopRuntime.6';  Name = '.NET 6 Desktop Runtime'        },
         @{ Id = 'Microsoft.DotNet.DesktopRuntime.7';  Name = '.NET 7 Desktop Runtime'        },
         @{ Id = 'Microsoft.DotNet.DesktopRuntime.8';  Name = '.NET 8 Desktop Runtime'        },
-        @{ Id = 'Microsoft.VCRedist.2015+.x64';       Name = 'VC++ 2015-2022 Redist (x64)'   },
-        @{ Id = 'Microsoft.VCRedist.2015+.x86';       Name = 'VC++ 2015-2022 Redist (x86)'   }
+
+        # ---- Visual C++ Redistributables ----
+        @{ Id = 'Microsoft.VCRedist.2015+.x64';       Name = 'VC++ 2015-2022 Redist (x64)'  },
+        @{ Id = 'Microsoft.VCRedist.2015+.x86';       Name = 'VC++ 2015-2022 Redist (x86)'  }
     )
 
     $total   = $appsToInstall.Count
@@ -729,23 +882,49 @@ function Install-StandardApps {
 
     foreach ($app in $appsToInstall) {
         $current++
-        Set-PhaseProgress -Activity (T 'ProgApps') -Status "$(T 'Installing'): $($app.Name) ($current/$total)" -Current $current -Total $total
+        Set-PhaseProgress -Activity (T 'ProgApps') `
+                          -Status   "$(T 'Installing'): $($app.Name) ($current/$total)" `
+                          -Current  $current -Total $total
 
         Write-Log "$(T 'Installing'): $($app.Name)  [$($app.Id)]"
         try {
-            winget install --id $app.Id --source winget --accept-package-agreements --accept-source-agreements --silent 2>&1 | Out-Null
+            $attempt   = 0
+            $exitCode  = -1
+            $wingetOut = $null
 
-            if ($LASTEXITCODE -eq 0) {
+            do {
+                $attempt++
+                # Capture output rather than discarding it — logged on failure
+                $wingetOut = winget install --id $app.Id --source winget `
+                    --accept-package-agreements --accept-source-agreements `
+                    --silent 2>&1
+                $exitCode = $LASTEXITCODE
+
+                if ($exitCode -eq 0 -or $exitCode -eq $alreadyInstalledCode) { break }
+
+                if ($attempt -le $maxRetries -and $exitCode -in $networkErrorCodes) {
+                    Write-Log "$(T 'InstallRetrying') ($attempt/$maxRetries): $($app.Name) [exit $exitCode]" -Level 'WARN'
+                    Start-Sleep -Seconds $retryDelaySec
+                } else {
+                    break
+                }
+            } while ($true)
+
+            if ($exitCode -eq 0) {
                 Write-Log "$(T 'InstallOK'): $($app.Name)" -Level 'SUCCESS'
                 Add-Result -Section (T 'PhaseApps') -Item $app.Name -Status 'OK' -Detail (T 'InstallOK')
                 $script:Summary.AppsInstalled++
-            } elseif ($LASTEXITCODE -eq $alreadyInstalledCode) {
+            } elseif ($exitCode -eq $alreadyInstalledCode) {
                 Write-Log "$(T 'AlreadyInstalled'): $($app.Name)" -Level 'SUCCESS'
                 Add-Result -Section (T 'PhaseApps') -Item $app.Name -Status 'OK' -Detail (T 'AlreadyInstalled')
                 $script:Summary.AppsInstalled++
             } else {
-                Write-Log "$(T 'InstallFail'): $($app.Name) - exit code $LASTEXITCODE" -Level 'WARN'
-                Add-Result -Section (T 'PhaseApps') -Item $app.Name -Status 'WARN' -Detail "Exit code $LASTEXITCODE"
+                Write-Log "$(T 'InstallFail'): $($app.Name) - exit code $exitCode" -Level 'WARN'
+                # Log last few lines of winget output to aid diagnosis.
+                # 2>&1 can produce ErrorRecord objects alongside strings — coerce to string first.
+                $diagLines = ($wingetOut | Where-Object { "$_".Trim() }) | Select-Object -Last 5
+                foreach ($line in $diagLines) { Write-Log "  $line" -Level 'WARN' }
+                Add-Result -Section (T 'PhaseApps') -Item $app.Name -Status 'WARN' -Detail "Exit code $exitCode"
                 $script:Summary.AppsFailed++
             }
         }
@@ -767,11 +946,13 @@ function Install-StandardApps {
 function Set-SystemConfiguration {
     Write-Log "--- $(T 'ProgConfig') ---" -Level 'SECTION'
 
+    # Flag policy-only keys — on Home edition these write successfully but have no effect.
+    # We log a WARN rather than SUCCESS so the report reflects reality.
     $configItems = @(
-        @{ Path = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection';  Name = 'AllowTelemetry';         Value = 0 },
-        @{ Path = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting';  Name = 'Disabled';               Value = 1 },
-        @{ Path = 'HKLM:\SOFTWARE\Microsoft\SQMClient\Windows';                Name = 'CEIPEnable';             Value = 0 },
-        @{ Path = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo'; Name = 'DisabledByGroupPolicy'; Value = 1 }
+        @{ Path = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection'; Name = 'AllowTelemetry';         Value = 0; PolicyOnly = $true  },
+        @{ Path = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting'; Name = 'Disabled';               Value = 1; PolicyOnly = $false },
+        @{ Path = 'HKLM:\SOFTWARE\Microsoft\SQMClient\Windows';               Name = 'CEIPEnable';             Value = 0; PolicyOnly = $false },
+        @{ Path = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo'; Name = 'DisabledByGroupPolicy'; Value = 1; PolicyOnly = $true  }
     )
 
     $total   = $configItems.Count
@@ -780,11 +961,46 @@ function Set-SystemConfiguration {
     foreach ($item in $configItems) {
         $current++
         Set-PhaseProgress -Activity (T 'ProgConfig') -Status $item.Name -Current $current -Total $total
+        if ($item.PolicyOnly -and $script:IsHome) {
+            Write-Log "$(T 'HomeEditionNote'): $($item.Name)" -Level 'WARN'
+        }
         Set-RegistryValue -Path $item.Path -Name $item.Name -Value $item.Value
     }
 
     Clear-PhaseProgress
     Write-Log (T 'SysConfigDone') -Level 'SUCCESS'
+}
+
+function Remove-OneDriveOem {
+    # On some OEM builds OneDrive is embedded as a setup binary in System32/SysWOW64
+    # rather than deployed as an Appx, so winget and Get-AppxPackage both miss it.
+    Write-Log "--- $(T 'OneDriveOem') ---" -Level 'SECTION'
+
+    $setupPaths = @(
+        # OEM-embedded binaries — these are system-wide and reliable under admin elevation.
+        # Per-user OneDrive installs ($env:LOCALAPPDATA) are excluded: under RunAs, LOCALAPPDATA
+        # resolves to the admin profile, not the interactive user, making the path unreliable.
+        "$env:SystemRoot\SysWOW64\OneDriveSetup.exe",
+        "$env:SystemRoot\System32\OneDriveSetup.exe"
+    )
+
+    foreach ($path in $setupPaths) {
+        if (Test-Path $path) {
+            Write-Log "$(T 'OneDriveOemFound'): $path"
+            try {
+                Start-Process -FilePath $path -ArgumentList '/uninstall' -Wait -WindowStyle Hidden -ErrorAction Stop
+                Write-Log (T 'OneDriveOemDone') -Level 'SUCCESS'
+                Add-Result -Section (T 'PhaseBloatware') -Item 'OneDrive (OEM binary)' -Status 'OK' -Detail $path
+            }
+            catch {
+                Write-Log "OEM OneDrive uninstall failed: $($_.Exception.Message)" -Level 'WARN'
+                Add-Result -Section (T 'PhaseBloatware') -Item 'OneDrive (OEM binary)' -Status 'WARN' -Detail $_.Exception.Message
+            }
+            return   # only process first binary found
+        }
+    }
+
+    Write-Log (T 'OneDriveOemNone')
 }
 
 # ================================
@@ -798,10 +1014,19 @@ function Export-HtmlReport {
     Set-PhaseProgress -Activity (T 'PhaseReporting') -Status (T 'ProgReportCollect') -Current 1 -Total 3
 
     $os          = Get-CimInstance Win32_OperatingSystem
-    $cpu         = ConvertTo-HtmlSafe ((Get-CimInstance Win32_Processor | Select-Object -First 1).Name)
+    $cpu         = ConvertTo-HtmlSafe (Get-CimInstance Win32_Processor | Select-Object -First 1).Name
     $osCaption   = ConvertTo-HtmlSafe $os.Caption
-    $osEdition   = ConvertTo-HtmlSafe $script:EditionId
-    $osBuild     = ConvertTo-HtmlSafe ([string]$script:OsBuild)
+    $osEdition   = ConvertTo-HtmlSafe (
+        switch -Regex ($os.Caption) {
+            '\bHome\b'       { 'Home'        }
+            '\bPro\b'        { 'Pro'         }
+            '\bEnterprise\b' { 'Enterprise'  }
+            '\bEducation\b'  { 'Education'   }
+            '\bServer\b'     { 'Server'      }
+            default          { 'Unknown'     }
+        }
+    )
+    $osBuild     = $script:OsBuild
     $ramGB       = [math]::Round($os.TotalVisibleMemorySize / 1MB, 1)
     $uptimeHrs   = [math]::Round(((Get-Date) - $os.LastBootUpTime).TotalHours, 1)
     $duration     = (Get-Date) - $script:StartTime
@@ -823,7 +1048,7 @@ function Export-HtmlReport {
         "<tr class='section-header'><td colspan='3'>$(ConvertTo-HtmlSafe $section.Name)</td></tr>"
         foreach ($r in $section.Group) {
             $css  = switch ($r.Status) { 'OK'{'status-ok'} 'SKIPPED'{'status-skipped'} 'WARN'{'status-warn'} 'FAILED'{'status-failed'} }
-            $icon = switch ($r.Status) { 'OK'{'&#10003;'}  'SKIPPED'{'&#8212;'}        'WARN'{'&#9888;'}     'FAILED'{'&#10007;'} }
+            $icon = switch ($r.Status) { 'OK'{'&#10003;'}  'SKIPPED'{'&#8212;'}        'WARN'{'&#9888;'}     'FAILED'{'&#10007;'}      }
             "<tr><td>$(ConvertTo-HtmlSafe $r.Item)</td><td class='$css'>$icon $($r.Status)</td><td>$(ConvertTo-HtmlSafe $r.Detail)</td></tr>"
         }
     }
@@ -833,6 +1058,7 @@ function Export-HtmlReport {
         "<tr class='$css'><td>$($_.Timestamp)</td><td>$($_.Level)</td><td>$(ConvertTo-HtmlSafe $_.Message)</td></tr>"
     }
 
+    # Localized HTML labels
     $lHtmlTitle       = T 'HtmlTitle'
     $lGenerated       = T 'HtmlGenerated'
     $lSysInfo         = T 'HtmlSysInfo'
@@ -841,8 +1067,6 @@ function Export-HtmlReport {
     $lEventLog        = T 'HtmlEventLog'
     $lHostname        = T 'HtmlHostname'
     $lOS              = T 'HtmlOS'
-    $lEdition         = T 'HtmlEdition'
-    $lBuild           = T 'HtmlBuild'
     $lCPU             = T 'HtmlCPU'
     $lRAM             = T 'HtmlRAM'
     $lUptime          = T 'HtmlUptime'
@@ -863,6 +1087,8 @@ function Export-HtmlReport {
     $lConfigFail      = T 'HtmlConfigFail'
     $lMcAfee          = T 'HtmlMcAfee'
     $lHrs             = T 'HtmlHrs'
+    $lEdition         = T 'HtmlEdition'
+    $lBuild           = T 'HtmlBuild'
 
     $html = @"
 <!DOCTYPE html>
@@ -937,7 +1163,7 @@ function Export-HtmlReport {
   <div class="info-card"><div class="label">$lRAM</div><div class="value">$ramGB GB</div></div>
   <div class="info-card"><div class="label">$lUptime</div><div class="value">$uptimeHrs $lHrs</div></div>
   <div class="info-card"><div class="label">$lRunTime</div><div class="value">$durationFmt</div></div>
-  <div class="info-card"><div class="label">$lVersion</div><div class="value">$script:Version</div></div>
+  <div class="info-card"><div class="label">$lVersion</div><div class="value">5.1</div></div>
   <div class="info-card"><div class="label">$lTechnician</div><div class="value">PNWC</div></div>
 </div>
 
@@ -1001,13 +1227,13 @@ function Write-ConsoleSummary {
     Write-Log $border -Level 'SECTION'
     Write-Log (T 'SumTitle') -Level 'SECTION'
     Write-Log $border -Level 'SECTION'
-    Write-Log "$((T 'SumAppsOK')) : $($script:Summary.AppsInstalled)"
-    Write-Log "$((T 'SumAppsFail')) : $($script:Summary.AppsFailed)"
-    Write-Log "$((T 'SumAppx')) : $($script:Summary.AppxRemoved)"
-    Write-Log "$((T 'SumCaps')) : $($script:Summary.CapabilitiesRemoved)"
-    Write-Log "$((T 'SumConfigOK')) : $($script:Summary.HardeningApplied)"
-    Write-Log "$((T 'SumConfigFail')) : $($script:Summary.HardeningFailed)"
-    Write-Log "$((T 'SumMcAfee')) : $($script:Summary.McAfeeRemoved)"
+    Write-Log "$( (T 'SumAppsOK')    ) : $($script:Summary.AppsInstalled)"
+    Write-Log "$( (T 'SumAppsFail')  ) : $($script:Summary.AppsFailed)"
+    Write-Log "$( (T 'SumAppx')      ) : $($script:Summary.AppxRemoved)"
+    Write-Log "$( (T 'SumCaps')      ) : $($script:Summary.CapabilitiesRemoved)"
+    Write-Log "$( (T 'SumConfigOK')  ) : $($script:Summary.HardeningApplied)"
+    Write-Log "$( (T 'SumConfigFail')) : $($script:Summary.HardeningFailed)"
+    Write-Log "$( (T 'SumMcAfee')    ) : $($script:Summary.McAfeeRemoved)"
     Write-Log $border -Level 'SECTION'
 }
 
@@ -1015,12 +1241,14 @@ function Write-ConsoleSummary {
 # Main Execution
 # ================================
 
+# Overall progress weights (must total 100)
+# Phases: Init=5, Bloatware=35, Apps=40, Config=15, Report=5
 $script:PhasePct = @{ Init = 5; BloatStart = 5; BloatEnd = 40; AppsStart = 40; AppsEnd = 80; ConfigStart = 80; ConfigEnd = 95; Done = 100 }
 
 try {
     Set-OverallProgress -Status (T 'ManagingSources') -Percent $script:PhasePct.Init
 
-    if (-not (Test-Winget)) {
+    if (-not (Install-WingetIfNeeded)) {
         Write-Log (T 'WingetRequired') -Level 'ERROR'
         throw 'Winget not available'
     }
@@ -1037,6 +1265,7 @@ try {
         )
         Remove-WingetApps -AppPatterns $bloatwarePatterns
         Remove-AppxPackages
+        Remove-OneDriveOem
         Remove-WindowsCapabilities
         Remove-McAfeeProducts
         Set-OverallProgress -Status "$(T 'PhaseBloatware') - Complete" -Percent $script:PhasePct.BloatEnd
@@ -1079,20 +1308,19 @@ try {
 
     Write-Log "===== $(T 'Completed') =====" -Level 'SUCCESS'
     Write-Host "`n*** $(T 'SetupComplete') ***" -ForegroundColor Green
-    Write-Host "    Log    : $LogPath" -ForegroundColor Gray
-    Write-Host "    Report : $ReportPath" -ForegroundColor Cyan
-    Write-Host "`n$(T 'PressEnter')" -ForegroundColor Yellow
+    Write-Host "    Log    : $LogPath"          -ForegroundColor Gray
+    Write-Host "    Report : $ReportPath"       -ForegroundColor Cyan
+    Write-Host "`n$(T 'PressEnter')"            -ForegroundColor Yellow
     Read-Host | Out-Null
-    exit 0
 }
 catch {
     Write-Log "$(T 'CriticalError'): $($_.Exception.Message)" -Level 'ERROR'
     try { Export-HtmlReport -OverallStatus 'FAILED' } catch {}
     Write-Host "`n*** $(T 'SetupFailed'): $LogPath ***" -ForegroundColor Red
-    Read-Host "`n$(T 'PressEnter')" | Out-Null
     exit 1
 }
 finally {
+    # Always clear progress bars — runs on success, failure, and Ctrl+C
     Write-Progress -Id 1 -Activity ' ' -Completed
     Write-Progress -Id 0 -Activity ' ' -Completed
 }
