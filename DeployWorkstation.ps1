@@ -846,10 +846,10 @@ function Install-StandardApps {
 
     # Winget exit codes that indicate a transient network problem — worth retrying
     $networkErrorCodes = @(
-        -1978335479,  # 0x8A150109  winget download failed
-        -1978335478,  # 0x8A15010A  winget network timeout
-        -2147954407,  # 0x80072EE9  connection reset by peer
-        -2147954393,  # 0x80072EF7  DNS name not resolved
+        -1978334967,  # 0x8A150109  winget download failed
+        -1978334966,  # 0x8A15010A  winget network timeout
+        -2147012887,  # 0x80072EE9  connection reset by peer
+        -2147012873,  # 0x80072EF7  DNS name not resolved
         -2147012867   # 0x80072EFD  connection refused
     )
     $maxRetries   = 2
@@ -920,8 +920,9 @@ function Install-StandardApps {
                 $script:Summary.AppsInstalled++
             } else {
                 Write-Log "$(T 'InstallFail'): $($app.Name) - exit code $exitCode" -Level 'WARN'
-                # Log last few lines of winget output to aid diagnosis
-                $diagLines = ($wingetOut | Where-Object { $_ -and $_.Trim() }) | Select-Object -Last 5
+                # Log last few lines of winget output to aid diagnosis.
+                # 2>&1 can produce ErrorRecord objects alongside strings — coerce to string first.
+                $diagLines = ($wingetOut | Where-Object { "$_".Trim() }) | Select-Object -Last 5
                 foreach ($line in $diagLines) { Write-Log "  $line" -Level 'WARN' }
                 Add-Result -Section (T 'PhaseApps') -Item $app.Name -Status 'WARN' -Detail "Exit code $exitCode"
                 $script:Summary.AppsFailed++
@@ -976,9 +977,11 @@ function Remove-OneDriveOem {
     Write-Log "--- $(T 'OneDriveOem') ---" -Level 'SECTION'
 
     $setupPaths = @(
+        # OEM-embedded binaries — these are system-wide and reliable under admin elevation.
+        # Per-user OneDrive installs ($env:LOCALAPPDATA) are excluded: under RunAs, LOCALAPPDATA
+        # resolves to the admin profile, not the interactive user, making the path unreliable.
         "$env:SystemRoot\SysWOW64\OneDriveSetup.exe",
-        "$env:SystemRoot\System32\OneDriveSetup.exe",
-        "$env:LOCALAPPDATA\Microsoft\OneDrive\OneDriveSetup.exe"
+        "$env:SystemRoot\System32\OneDriveSetup.exe"
     )
 
     foreach ($path in $setupPaths) {
