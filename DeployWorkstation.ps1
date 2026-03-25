@@ -1016,16 +1016,13 @@ function Export-HtmlReport {
     $os          = Get-CimInstance Win32_OperatingSystem
     $cpu         = ConvertTo-HtmlSafe (Get-CimInstance Win32_Processor | Select-Object -First 1).Name
     $osCaption   = ConvertTo-HtmlSafe $os.Caption
-    $osEdition   = ConvertTo-HtmlSafe (
-        switch -Regex ($os.Caption) {
-            '\bHome\b'       { 'Home'        }
-            '\bPro\b'        { 'Pro'         }
-            '\bEnterprise\b' { 'Enterprise'  }
-            '\bEducation\b'  { 'Education'   }
-            '\bServer\b'     { 'Server'      }
-            default          { 'Unknown'     }
-        }
-    )
+    $osEditionRaw = 'Unknown'
+    if ($os.Caption -match '\bHome\b') { $osEditionRaw = 'Home' }
+    elseif ($os.Caption -match '\bPro\b') { $osEditionRaw = 'Pro' }
+    elseif ($os.Caption -match '\bEnterprise\b') { $osEditionRaw = 'Enterprise' }
+    elseif ($os.Caption -match '\bEducation\b') { $osEditionRaw = 'Education' }
+    elseif ($os.Caption -match '\bServer\b') { $osEditionRaw = 'Server' }
+    $osEdition   = ConvertTo-HtmlSafe $osEditionRaw
     $osBuild     = $script:OsBuild
     $ramGB       = [math]::Round($os.TotalVisibleMemorySize / 1MB, 1)
     $uptimeHrs   = [math]::Round(((Get-Date) - $os.LastBootUpTime).TotalHours, 1)
