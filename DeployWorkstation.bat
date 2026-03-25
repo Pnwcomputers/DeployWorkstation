@@ -1,136 +1,124 @@
 @echo off
 REM ========================================================
-REM  DeployWorkstation.bat
-REM  Launcher for DeployWorkstation.ps1
-REM  Version 5.1 – PNWC Edition
+REM  DeployWorkstation-Launcher.bat
+REM  Ensures elevation, then runs DeployWorkstation.ps1
+REM  Compatible with the optimized PowerShell script
 REM ========================================================
 
 setlocal enabledelayedexpansion
 
 echo.
-echo ===== DeployWorkstation Launcher v5.1 =====
+echo ===== DeployWorkstation Launcher =====
 echo.
 
-REM --------------------------------------------------------
-REM  1) Elevation check
-REM     Re-launch this .bat elevated if not already admin.
-REM --------------------------------------------------------
+REM 1) Check if we're already elevated
+
 net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo Requesting administrative privileges...
-    echo Please click "Yes" in the UAC prompt.
+    echo Please click "Yes" in the UAC prompt that appears.
     echo.
+    
+    REM Re-launch this batch file with elevation
     powershell.exe -NoProfile -Command ^
-        "Start-Process -FilePath '%~f0' -Verb RunAs -Wait"
+      "Start-Process -FilePath '%~f0' -Verb RunAs -Wait"
+    
+    REM Exit the non-elevated instance
     exit /b
 )
 
-echo [OK] Running as Administrator.
+REM 2) We're now elevated - show confirmation
+echo Administrative privileges confirmed.
+echo Current directory: %~dp0
 echo.
 
-REM --------------------------------------------------------
-REM  2) Change to the directory containing this .bat
-REM --------------------------------------------------------
+REM 3) Change to script directory
 pushd "%~dp0"
 
-REM --------------------------------------------------------
-REM  3) Verify the PowerShell script is present
-REM --------------------------------------------------------
+REM 4) Check if PowerShell script exists
+
 if not exist "DeployWorkstation.ps1" (
-    echo [ERROR] DeployWorkstation.ps1 not found.
-    echo         Expected: %~dp0DeployWorkstation.ps1
+    echo ERROR: DeployWorkstation.ps1 not found in current directory!
+    echo Expected location: %~dp0DeployWorkstation.ps1
     echo.
     goto :error_exit
 )
 
-REM --------------------------------------------------------
-REM  4) Menu
-REM --------------------------------------------------------
-:menu
-echo Select deployment mode:
-echo.
-echo   1. Full deployment  (remove bloatware + install apps + configure system)
+REM 5) Show options menu
+echo Available options:
+echo   1. Full deployment (remove bloatware + install apps)
+
+
+
+
 echo   2. Remove bloatware only
 echo   3. Install apps only
-echo   4. System configuration only
-echo   5. Exit
-echo.
-set "choice="
-set /p choice="Enter choice (1-5): "
+echo   4. Exit
 
+echo.
+set /p choice="Enter your choice (1-4): "
+
+
+REM 6) Set PowerShell parameters based on choice
 set "ps_params="
 
 if "%choice%"=="1" (
-    echo.
-    echo [*] Full deployment selected.
+    echo Running full deployment...
+    set "ps_params="
+
 ) else if "%choice%"=="2" (
-    echo.
-    echo [*] Bloatware removal only.
-    set "ps_params=-SkipAppInstall -SkipSystemConfig"
+    echo Running bloatware removal only...
+    set "ps_params=-SkipAppInstall"
+
 ) else if "%choice%"=="3" (
-    echo.
-    echo [*] App installation only.
-    set "ps_params=-SkipBloatwareRemoval -SkipSystemConfig"
+    echo Running app installation only...
+    set "ps_params=-SkipBloatwareRemoval"
+
 ) else if "%choice%"=="4" (
-    echo.
-    echo [*] System configuration only.
-    set "ps_params=-SkipBloatwareRemoval -SkipAppInstall"
-) else if "%choice%"=="5" (
-    echo Exiting.
+    echo Exiting...
     goto :normal_exit
 ) else (
-    echo [!] Invalid choice - please try again.
-    echo.
-    goto :menu
+    echo Invalid choice. Running full deployment...
+    set "ps_params="
 )
 
-REM --------------------------------------------------------
-REM  5) Show what will run, then launch
-REM --------------------------------------------------------
-if "!ps_params!"=="" (
-    echo     Parameters : (none - full run)
-) else (
-    echo     Parameters : !ps_params!
-)
 echo.
-echo Starting Windows PowerShell 5.1...
+echo Starting PowerShell script with Windows PowerShell 5.1...
+echo Parameters: %ps_params%
 echo.
 
-if "!ps_params!"=="" (
+REM 7) Run the PowerShell script with proper parameters
+if "%ps_params%"=="" (
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File "DeployWorkstation.ps1"
 ) else (
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "DeployWorkstation.ps1" !ps_params!
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "DeployWorkstation.ps1" %ps_params%
 )
 
-REM Capture exit code immediately before anything can overwrite it
-set "ps_exit=%errorlevel%"
+REM 8) Check exit code and report results
+if %errorlevel% equ 0 (
+    echo.
 
-REM --------------------------------------------------------
-REM  6) Result
-REM --------------------------------------------------------
-echo.
-if "%ps_exit%"=="0" (
     echo ===== Deployment completed successfully =====
 ) else (
-    echo ===== Deployment finished with errors =====
-    echo     Exit code : %ps_exit%
-    echo     Check DeployWorkstation.log in this folder for details.
+    echo.
+    echo ===== Deployment completed with errors =====
+    echo Exit code: %errorlevel%
+    echo Check the log file for details.
 )
 
 goto :normal_exit
 
-REM --------------------------------------------------------
 :error_exit
 echo.
-echo ===== Launch aborted =====
+echo ===== Deployment failed =====
 popd
 pause
 exit /b 1
 
-REM --------------------------------------------------------
 :normal_exit
+REM 9) Return to original directory and pause
 popd
 echo.
-echo Press any key to close...
+echo Press any key to exit...
 pause >nul
 exit /b 0
