@@ -864,13 +864,6 @@ function Install-StandardApps {
         -2147012889   # 0x80072EE7  InternetOpenUrl failed / WinHTTP unknown error
     )
 
-    # Known permanent failure codes — not retried, shown with a friendly message
-    $knownFailMessages = @{
-        '-1978335215' = 'Installer hash mismatch (try again later or check proxy/AV)'  # 0x8A150011
-        '-1978335212' = 'Package not found in winget source (ID may have changed)'     # 0x8A15002C
-        '-1978334960' = 'Installer blocked by security policy'                          # 0x8A150110
-        '-1978335132' = 'Installer requires reboot before proceeding'                   # 0x8A150064
-    }
     $maxRetries    = 2
     $retryDelaySec = 10
 
@@ -938,21 +931,30 @@ function Install-StandardApps {
                 Add-Result -Section (T 'PhaseApps') -Item $app.Name -Status 'OK' -Detail (T 'AlreadyInstalled')
                 $script:Summary.AppsInstalled++
             } else {
-                # Resolve a friendly reason — use known message or fall back to exit code
-                $failReason = if ($knownFailMessages.ContainsKey("$exitCode")) {
-                    $knownFailMessages["$exitCode"]
-                } else {
-                    "Exit code $exitCode"
+                # Map exit code to a human-readable reason.
+                # Using switch($int) avoids hashtable string/int key-type ambiguity.
+                # Network codes here cover the "all retries exhausted" path.
+                $failReason = switch ($exitCode) {
+                    -1978335215 { 'Installer hash mismatch — retry later or check proxy/AV'     }  # 0x8A150011
+                    -1978335212 { 'Package not found in winget source (ID may have changed)'     }  # 0x8A15002C
+                    -1978334960 { 'Installer blocked by security policy'                          }  # 0x8A150110
+                    -1978335132 { 'Installer requires reboot before continuing'                   }  # 0x8A150064
+                    -1978334967 { 'Network failure — download failed (all retries exhausted)'    }  # 0x8A150109
+                    -1978334966 { 'Network failure — timed out (all retries exhausted)'          }  # 0x8A15010A
+                    -2147012887 { 'Network failure — connection reset (all retries exhausted)'   }  # 0x80072EE9
+                    -2147012873 { 'Network failure — DNS not resolved (all retries exhausted)'   }  # 0x80072EF7
+                    -2147012867 { 'Network failure — connection refused (all retries exhausted)' }  # 0x80072EFD
+                    -2147012889 { 'Network failure — WinHTTP error (all retries exhausted)'      }  # 0x80072EE7
+                    default     { "Exit code $exitCode" }
                 }
                 Write-Log "$(T 'InstallFail'): $($app.Name) - $failReason" -Level 'WARN'
                 # Log last clean lines of winget output — strip progress-bar/spinner noise
                 $diagLines = ($wingetOut | Where-Object { "$_".Trim() }) | Select-Object -Last 8
                 foreach ($line in $diagLines) {
-                    # Strip non-printable chars, then skip spinner frames and short noise
-                    $clean = ("$line" -replace '[^\x20-\x7E]', '').Trim()
-                    if ($clean.Length -lt 8)                  { continue }  # too short (spinner: \|/-)
-                    if ($clean -match '^[\\|/\-]+$')        { continue }  # pure spinner frame
-                    if ($clean -match '^\s*\d+\s*MB')       { continue }  # progress bytes only
+                    $clean = ("$line" -replace '[^ -~]', '').Trim()
+                    if ($clean.Length -lt 8)          { continue }  # spinner chars: \|/-
+                    if ($clean -match '^[\|/\-]+$')  { continue }  # pure spinner frame
+                    if ($clean -match '^\s*\d+\s*MB') { continue }  # "141 MB / 143 MB" lines
                     Write-Log "  $clean" -Level 'WARN'
                 }
                 Add-Result -Section (T 'PhaseApps') -Item $app.Name -Status 'WARN' -Detail $failReason
