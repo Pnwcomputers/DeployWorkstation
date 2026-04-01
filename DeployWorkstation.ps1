@@ -860,9 +860,17 @@ function Install-StandardApps {
         -1978334966,  # 0x8A15010A  winget network timeout
         -2147012887,  # 0x80072EE9  connection reset by peer
         -2147012873,  # 0x80072EF7  DNS name not resolved
-        -2147012867   # 0x80072EFD  connection refused
+        -2147012867,  # 0x80072EFD  connection refused
+        -2147012889   # 0x80072EE7  InternetOpenUrl failed / WinHTTP unknown error
     )
-    $maxRetries   = 2
+
+    # Known permanent failure codes — not retried, shown with a friendly message
+    $knownFailMessages = @{
+        -1978335215 = 'Installer hash mismatch (try again later or check proxy/AV)'  # 0x8A150011
+        -1978334960 = 'Installer blocked by security policy'                          # 0x8A150110
+        -1978335132 = 'Installer requires reboot before proceeding'                   # 0x8A150064
+    }
+    $maxRetries    = 2
     $retryDelaySec = 10
 
     $appsToInstall = @(
@@ -929,12 +937,20 @@ function Install-StandardApps {
                 Add-Result -Section (T 'PhaseApps') -Item $app.Name -Status 'OK' -Detail (T 'AlreadyInstalled')
                 $script:Summary.AppsInstalled++
             } else {
-                Write-Log "$(T 'InstallFail'): $($app.Name) - exit code $exitCode" -Level 'WARN'
-                # Log last few lines of winget output to aid diagnosis.
-                # 2>&1 can produce ErrorRecord objects alongside strings — coerce to string first.
+                # Resolve a friendly reason — use known message or fall back to exit code
+                $failReason = if ($knownFailMessages.ContainsKey($exitCode)) {
+                    $knownFailMessages[$exitCode]
+                } else {
+                    "Exit code $exitCode"
+                }
+                Write-Log "$(T 'InstallFail'): $($app.Name) - $failReason" -Level 'WARN'
+                # Log last clean lines of winget output — strip progress-bar/non-printable chars
                 $diagLines = ($wingetOut | Where-Object { "$_".Trim() }) | Select-Object -Last 5
-                foreach ($line in $diagLines) { Write-Log "  $line" -Level 'WARN' }
-                Add-Result -Section (T 'PhaseApps') -Item $app.Name -Status 'WARN' -Detail "Exit code $exitCode"
+                foreach ($line in $diagLines) {
+                    $clean = ("$line" -replace '[^\x20-\x7E]', '').Trim()
+                    if ($clean.Length -gt 3) { Write-Log "  $clean" -Level 'WARN' }
+                }
+                Add-Result -Section (T 'PhaseApps') -Item $app.Name -Status 'WARN' -Detail $failReason
                 $script:Summary.AppsFailed++
             }
         }
