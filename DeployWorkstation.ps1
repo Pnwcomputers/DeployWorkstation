@@ -866,10 +866,10 @@ function Install-StandardApps {
 
     # Known permanent failure codes — not retried, shown with a friendly message
     $knownFailMessages = @{
-        -1978335215 = 'Installer hash mismatch (try again later or check proxy/AV)'  # 0x8A150011
-        -1978335212 = 'Package not found in winget source (ID may have changed)'     # 0x8A15002C
-        -1978334960 = 'Installer blocked by security policy'                          # 0x8A150110
-        -1978335132 = 'Installer requires reboot before proceeding'                   # 0x8A150064
+        '-1978335215' = 'Installer hash mismatch (try again later or check proxy/AV)'  # 0x8A150011
+        '-1978335212' = 'Package not found in winget source (ID may have changed)'     # 0x8A15002C
+        '-1978334960' = 'Installer blocked by security policy'                          # 0x8A150110
+        '-1978335132' = 'Installer requires reboot before proceeding'                   # 0x8A150064
     }
     $maxRetries    = 2
     $retryDelaySec = 10
@@ -939,8 +939,8 @@ function Install-StandardApps {
                 $script:Summary.AppsInstalled++
             } else {
                 # Resolve a friendly reason — use known message or fall back to exit code
-                $failReason = if ($knownFailMessages.ContainsKey($exitCode)) {
-                    $knownFailMessages[$exitCode]
+                $failReason = if ($knownFailMessages.ContainsKey("$exitCode")) {
+                    $knownFailMessages["$exitCode"]
                 } else {
                     "Exit code $exitCode"
                 }
