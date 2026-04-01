@@ -93,6 +93,21 @@ if "!ps_params!"=="" (
     echo     Parameters : !ps_params!
 )
 echo.
+echo Verifying script integrity...
+REM  Pass path via env var so PS resolves it — avoids CMD delayed-expansion
+REM  mangling of '!' characters in folder names (e.g. Deploy!v5.1\).
+set "DEPLOY_PS1=%~dp0DeployWorkstation.ps1"
+powershell.exe -NoProfile -Command ^
+    "$p=$env:DEPLOY_PS1;$null=[System.Management.Automation.Language.Parser]::ParseFile($p,[ref]$null,[ref]$e);if($e){$e|ForEach-Object{Write-Host('SYNTAX ERROR: '+$_.Message)};exit 1}"
+set "DEPLOY_PS1="
+if %errorlevel% neq 0 (
+    echo.
+    echo [ERROR] DeployWorkstation.ps1 has syntax errors - please re-download.
+    echo.
+    pause
+    goto :error_exit
+)
+
 echo Starting Windows PowerShell 5.1...
 echo.
 
@@ -131,6 +146,5 @@ REM --------------------------------------------------------
 :normal_exit
 popd
 echo.
-echo Press any key to close...
-pause >nul
+pause
 exit /b 0
