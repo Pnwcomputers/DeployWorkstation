@@ -11,9 +11,8 @@ echo.
 echo ===== DeployWorkstation Launcher v5.1 =====
 echo.
 
-REM --------------------------------------------------------
-REM  Elevation check - re-launch elevated if not admin
-REM --------------------------------------------------------
+REM 1) Check if we're already elevated
+
 net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo Requesting administrative privileges...
@@ -31,9 +30,8 @@ REM  Change to the directory containing this .bat
 REM --------------------------------------------------------
 pushd "%~dp0"
 
-REM --------------------------------------------------------
-REM  Verify the PowerShell script is present
-REM --------------------------------------------------------
+REM 4) Check if PowerShell script exists
+
 if not exist "DeployWorkstation.ps1" (
     echo [ERROR] DeployWorkstation.ps1 not found in:
     echo         %~dp0
@@ -44,34 +42,37 @@ if not exist "DeployWorkstation.ps1" (
     goto :error_exit
 )
 
-REM --------------------------------------------------------
-REM  Menu
-REM --------------------------------------------------------
-:menu
-echo Select deployment mode:
-echo.
-echo   1. Full deployment  (remove bloatware + install apps + configure system)
+REM 5) Show options menu
+echo Available options:
+echo   1. Full deployment (remove bloatware + install apps)
+
+
+
+
 echo   2. Remove bloatware only
 echo   3. Install apps only
-echo   4. System configuration only
-echo   5. Exit
+echo   4. Exit
+
 echo.
 set "choice="
 set /p choice="Enter choice (1-5): "
 
+
+REM 6) Set PowerShell parameters based on choice
 set "ps_params="
 
 if "%choice%"=="1" (
-    echo.
-    echo [*] Full deployment selected.
+    echo Running full deployment...
+    set "ps_params="
+
 ) else if "%choice%"=="2" (
-    echo.
-    echo [*] Bloatware removal only.
-    set "ps_params=-SkipAppInstall -SkipSystemConfig"
+    echo Running bloatware removal only...
+    set "ps_params=-SkipAppInstall"
+
 ) else if "%choice%"=="3" (
-    echo.
-    echo [*] App installation only.
-    set "ps_params=-SkipBloatwareRemoval -SkipSystemConfig"
+    echo Running app installation only...
+    set "ps_params=-SkipBloatwareRemoval"
+
 ) else if "%choice%"=="4" (
     echo.
     echo [*] System configuration only.
@@ -103,10 +104,10 @@ if "!ps_params!"=="" (
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File "DeployWorkstation.ps1" !ps_params!
 )
 
-set "ps_exit=%errorlevel%"
+REM 8) Check exit code and report results
+if %errorlevel% equ 0 (
+    echo.
 
-echo.
-if "%ps_exit%"=="0" (
     echo ===== Deployment completed successfully =====
 ) else (
     echo ===== Deployment finished with errors =====

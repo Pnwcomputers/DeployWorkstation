@@ -1,0 +1,39 @@
+# --- Windows System Files ---
+[Dd]esktop.ini
+[Tt]humbs.db
+$RECYCLE.BIN/
+*.lnk
+
+# --- PowerShell / Scripting ---
+# Ignore PowerShell history and temporary sessions
+.history.ndjson
+__pycache__/
+*.log
+*.err
+*.out
+
+# --- Deployment Artifacts ---
+# Ignore downloaded installers (don't sync 500MB MSIs to GitHub)
+*.msi
+*.exe
+*.cab
+*.iso
+downloads/
+temp/
+
+# --- Sensitive Data (CRITICAL) ---
+# Ignore local environment configs or custom deployment variables
+.env
+config.local.ps1
+secrets.json
+*.pfx
+*.cer
+credentials.xml
+
+# --- Editor / IDE ---
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
