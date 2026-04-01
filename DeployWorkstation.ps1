@@ -1,5 +1,5 @@
 # DeployWorkstation.ps1 – Optimized Win10/11 Setup & Clean-up
-# Version: 5.1 – PNWC Edition *Updated 3-31-2026
+# Version: 5.1 – PNWC Edition
 # New in 5.0: Write-Progress console bars, embedded en-US / es-ES localization
 # New in 5.1: Winget auto-bootstrap, install retry logic, WU guard, OEM OneDrive, edition awareness
 
@@ -1016,16 +1016,15 @@ function Export-HtmlReport {
     $os          = Get-CimInstance Win32_OperatingSystem
     $cpu         = ConvertTo-HtmlSafe (Get-CimInstance Win32_Processor | Select-Object -First 1).Name
     $osCaption   = ConvertTo-HtmlSafe $os.Caption
-    $osEdition   = ConvertTo-HtmlSafe (
-        switch -Regex ($os.Caption) {
-            '\bHome\b'       { 'Home'        }
-            '\bPro\b'        { 'Pro'         }
-            '\bEnterprise\b' { 'Enterprise'  }
-            '\bEducation\b'  { 'Education'   }
-            '\bServer\b'     { 'Server'      }
-            default          { 'Unknown'     }
-        }
-    )
+    $editionRaw  = switch -Regex ($os.Caption) {
+                       '\bHome\b'       { 'Home'        }
+                       '\bPro\b'        { 'Pro'         }
+                       '\bEnterprise\b' { 'Enterprise'  }
+                       '\bEducation\b'  { 'Education'   }
+                       '\bServer\b'     { 'Server'      }
+                       default          { 'Unknown'     }
+                   }
+    $osEdition   = ConvertTo-HtmlSafe $editionRaw
     $osBuild     = $script:OsBuild
     $ramGB       = [math]::Round($os.TotalVisibleMemorySize / 1MB, 1)
     $uptimeHrs   = [math]::Round(((Get-Date) - $os.LastBootUpTime).TotalHours, 1)
