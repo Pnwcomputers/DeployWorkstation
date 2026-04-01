@@ -614,6 +614,13 @@ function Remove-WingetApps {
     param([string[]]$AppPatterns)
     Write-Log "--- $(T 'ProgBloatware') ---" -Level 'SECTION'
 
+    # Winget exit codes that mean "nothing to uninstall" — treat as SKIPPED, not WARN
+    $notFoundCodes = @(
+        -1978335212,  # 0x8A15002C  no package found to uninstall
+        -1978335189,  # 0x8A15002B  package not applicable / already gone
+        -1978334966   # 0x8A15010A  no installed package found
+    )
+
     $total   = $AppPatterns.Count
     $current = 0
 
@@ -643,6 +650,9 @@ function Remove-WingetApps {
             if ($LASTEXITCODE -eq 0) {
                 Write-Log "$(T 'Removed'): $pattern" -Level 'SUCCESS'
                 Add-Result -Section (T 'PhaseBloatware') -Item $pattern -Status 'OK' -Detail (T 'Removed')
+            } elseif ($LASTEXITCODE -in $notFoundCodes) {
+                Write-Log "$(T 'NotFound'): $pattern"
+                Add-Result -Section (T 'PhaseBloatware') -Item $pattern -Status 'SKIPPED' -Detail (T 'NotInstalled')
             } else {
                 Write-Log "$(T 'RemoveExitCode') $LASTEXITCODE for: $pattern" -Level 'WARN'
                 Add-Result -Section (T 'PhaseBloatware') -Item $pattern -Status 'WARN' -Detail "$(T 'RemoveExitCode') $LASTEXITCODE"
