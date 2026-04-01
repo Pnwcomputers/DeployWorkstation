@@ -867,6 +867,7 @@ function Install-StandardApps {
     # Known permanent failure codes — not retried, shown with a friendly message
     $knownFailMessages = @{
         -1978335215 = 'Installer hash mismatch (try again later or check proxy/AV)'  # 0x8A150011
+        -1978335212 = 'Package not found in winget source (ID may have changed)'     # 0x8A15002C
         -1978334960 = 'Installer blocked by security policy'                          # 0x8A150110
         -1978335132 = 'Installer requires reboot before proceeding'                   # 0x8A150064
     }
@@ -944,11 +945,15 @@ function Install-StandardApps {
                     "Exit code $exitCode"
                 }
                 Write-Log "$(T 'InstallFail'): $($app.Name) - $failReason" -Level 'WARN'
-                # Log last clean lines of winget output — strip progress-bar/non-printable chars
-                $diagLines = ($wingetOut | Where-Object { "$_".Trim() }) | Select-Object -Last 5
+                # Log last clean lines of winget output — strip progress-bar/spinner noise
+                $diagLines = ($wingetOut | Where-Object { "$_".Trim() }) | Select-Object -Last 8
                 foreach ($line in $diagLines) {
+                    # Strip non-printable chars, then skip spinner frames and short noise
                     $clean = ("$line" -replace '[^\x20-\x7E]', '').Trim()
-                    if ($clean.Length -gt 3) { Write-Log "  $clean" -Level 'WARN' }
+                    if ($clean.Length -lt 8)                  { continue }  # too short (spinner: \|/-)
+                    if ($clean -match '^[\\|/\-]+$')        { continue }  # pure spinner frame
+                    if ($clean -match '^\s*\d+\s*MB')       { continue }  # progress bytes only
+                    Write-Log "  $clean" -Level 'WARN'
                 }
                 Add-Result -Section (T 'PhaseApps') -Item $app.Name -Status 'WARN' -Detail $failReason
                 $script:Summary.AppsFailed++
