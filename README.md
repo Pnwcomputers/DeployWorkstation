@@ -1,4 +1,4 @@
-# 🚀 DeployWorkstation Version5.1
+# 🚀 DeployWorkstation Version5.1.1
 
 ![Automation Level](https://img.shields.io/badge/Automation-Zero%20Touch-green)
 ![Windows Support](https://img.shields.io/badge/Windows-10%20%7C%2011-blue)
@@ -11,7 +11,7 @@
 
 A PowerShell-based, automated provisioning solution that transforms Windows 10 & 11 workstation deployment from a 30-step manual process into a single "plug-and-play" operation. Whether you're imaging bare metal or cleaning up an existing PC, DeployWorkstation handles the heavy lifting of bloatware removal and essential application installation.
 
-## 🆕 What's New in Version5
+## 🆕 What's New in Version5.1
 
 - 🔧 Improved App Removal & Installation
 - 🚀 Advanced Reporting
