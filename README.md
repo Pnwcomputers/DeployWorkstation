@@ -1,4 +1,4 @@
-# 🚀 DeployWorkstation  (Testing)
+# 🚀 DeployWorkstation Version5.1 (Testing)
 
 ![Automation Level](https://img.shields.io/badge/Automation-Zero%20Touch-green)
 ![Windows Support](https://img.shields.io/badge/Windows-10%20%7C%2011-blue)
@@ -10,6 +10,14 @@
 **Zero-Touch Windows Workstation Provisioning Toolkit**
 
 A PowerShell-based, automated provisioning solution that transforms Windows 10 & 11 workstation deployment from a 30-step manual process into a single "plug-and-play" operation. Whether you're imaging bare metal or cleaning up an existing PC, DeployWorkstation handles the heavy lifting of bloatware removal and essential application installation.
+
+## 🆕 What's New in Version5
+
+- 🔧 Improved App Removal & Installation
+- 🚀 Advanced Reporting
+- 🔄 Configuration Management Integration
+- ✅ Multi-language Support
+- ✅ Real-time Progress
 
 ## ✨ Key Features
 
@@ -209,7 +217,7 @@ $EmailAlerts = $true         # Send completion notifications
 
 ## 🛠️ Project Structure
 
-```
+```text
 DeployWorkstation/
 ├── DeployWorkstation.ps1      # Main PowerShell script
 ├── DeployWorkstation.cmd      # Self-elevating launcher
@@ -269,23 +277,15 @@ winget list --source winget
 
 ## 🔮 Roadmap
 
-### Version 1.1 (Q3 2025)
-- ✅ GUI Configuration Interface
-- ✅ Network Deployment Server
-- ✅ Real-time Progress Dashboard
-- ✅ Multi-language Support
-
-### Version 2.0 (Q4 2025)
-- 🚀 Windows Server Support
-- 🚀 Domain Integration
-- 🚀 Cloud Configuration Sync
-- 🚀 Advanced Reporting
-
 ### Future Enhancements
-- 🔄 Configuration Management Integration
 - 📊 Analytics and Telemetry
 - 🤖 AI-Powered Optimization
 - 🌐 Web-based Management Console
+- 🚀 Windows Server Support
+- 🚀 Domain Integration
+- 🚀 Cloud Configuration Sync
+- ✅ GUI Configuration Interface
+- ✅ Network Deployment Server
 
 ## 🤝 Contributing
 
@@ -307,7 +307,7 @@ We welcome contributions! Here's how to get started:
 - Consider implementation complexity
 
 ### 🔒 Security Issues
-- Email security@pnwcomputers.com
+- Email [support@pnwcomputers.com](mailto:support@pnwcomputers.com)
 - Include proof of concept (if safe)
 - Allow reasonable disclosure time
 
@@ -320,7 +320,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) f
 - 📖 **Documentation**: Check this README and project wiki
 - 🐛 **Bug Reports**: Open an issue on GitHub
 - 💡 **Feature Requests**: Open an issue with [FEATURE] tag
-- 🔒 **Security Issues**: Email [security@pnwcomputers.com](mailto:security@pnwcomputers.com)
 - 💬 **General Support**: Email [support@pnwcomputers.com](mailto:support@pnwcomputers.com)
 
 ---

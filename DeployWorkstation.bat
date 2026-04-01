@@ -1,14 +1,14 @@
 @echo off
+title DeployWorkstation Launcher v5.1
 REM ========================================================
-REM  DeployWorkstation-Launcher.bat
-REM  Ensures elevation, then runs DeployWorkstation.ps1
-REM  Compatible with the optimized PowerShell script
+REM  DeployWorkstation.bat  -  Launcher for DeployWorkstation.ps1
+REM  Version 5.1 - PNWC Edition 4.1.2026
 REM ========================================================
 
 setlocal enabledelayedexpansion
 
 echo.
-echo ===== DeployWorkstation Launcher =====
+echo ===== DeployWorkstation Launcher v5.1 =====
 echo.
 
 REM 1) Check if we're already elevated
@@ -16,31 +16,29 @@ REM 1) Check if we're already elevated
 net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo Requesting administrative privileges...
-    echo Please click "Yes" in the UAC prompt that appears.
+    echo Please accept the UAC prompt.
     echo.
-    
-    REM Re-launch this batch file with elevation
-    powershell.exe -NoProfile -Command ^
-      "Start-Process -FilePath '%~f0' -Verb RunAs -Wait"
-    
-    REM Exit the non-elevated instance
-    exit /b
+    powershell.exe -NoProfile -Command "Start-Process cmd.exe -ArgumentList '/c "%~f0"' -Verb RunAs"
+    exit /b 0
 )
 
-REM 2) We're now elevated - show confirmation
-echo Administrative privileges confirmed.
-echo Current directory: %~dp0
+echo [OK] Running as Administrator.
 echo.
 
-REM 3) Change to script directory
+REM --------------------------------------------------------
+REM  Change to the directory containing this .bat
+REM --------------------------------------------------------
 pushd "%~dp0"
 
 REM 4) Check if PowerShell script exists
 
 if not exist "DeployWorkstation.ps1" (
-    echo ERROR: DeployWorkstation.ps1 not found in current directory!
-    echo Expected location: %~dp0DeployWorkstation.ps1
+    echo [ERROR] DeployWorkstation.ps1 not found in:
+    echo         %~dp0
     echo.
+    echo Both files must be in the same folder.
+    echo.
+    pause
     goto :error_exit
 )
 
@@ -56,7 +54,8 @@ echo   3. Install apps only
 echo   4. Exit
 
 echo.
-set /p choice="Enter your choice (1-4): "
+set "choice="
+set /p choice="Enter choice (1-5): "
 
 
 REM 6) Set PowerShell parameters based on choice
@@ -75,23 +74,34 @@ if "%choice%"=="1" (
     set "ps_params=-SkipBloatwareRemoval"
 
 ) else if "%choice%"=="4" (
-    echo Exiting...
+    echo.
+    echo [*] System configuration only.
+    set "ps_params=-SkipBloatwareRemoval -SkipAppInstall"
+) else if "%choice%"=="5" (
+    echo Exiting.
     goto :normal_exit
 ) else (
-    echo Invalid choice. Running full deployment...
-    set "ps_params="
+    echo [!] Invalid choice - please try again.
+    echo.
+    goto :menu
 )
 
+REM --------------------------------------------------------
+REM  Launch
+REM --------------------------------------------------------
+if "!ps_params!"=="" (
+    echo     Parameters : (none - full run)
+) else (
+    echo     Parameters : !ps_params!
+)
 echo.
-echo Starting PowerShell script with Windows PowerShell 5.1...
-echo Parameters: %ps_params%
+echo Starting Windows PowerShell 5.1...
 echo.
 
-REM 7) Run the PowerShell script with proper parameters
-if "%ps_params%"=="" (
+if "!ps_params!"=="" (
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File "DeployWorkstation.ps1"
 ) else (
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "DeployWorkstation.ps1" %ps_params%
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "DeployWorkstation.ps1" !ps_params!
 )
 
 REM 8) Check exit code and report results
@@ -100,25 +110,23 @@ if %errorlevel% equ 0 (
 
     echo ===== Deployment completed successfully =====
 ) else (
-    echo.
-    echo ===== Deployment completed with errors =====
-    echo Exit code: %errorlevel%
-    echo Check the log file for details.
+    echo ===== Deployment finished with errors =====
+    echo     Exit code  : %ps_exit%
+    echo     Log file   : %~dp0DeployWorkstation.log
 )
 
 goto :normal_exit
 
 :error_exit
 echo.
-echo ===== Deployment failed =====
+echo ===== Launch aborted =====
 popd
 pause
 exit /b 1
 
 :normal_exit
-REM 9) Return to original directory and pause
 popd
 echo.
-echo Press any key to exit...
+echo Press any key to close...
 pause >nul
 exit /b 0
