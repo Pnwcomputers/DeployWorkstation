@@ -1,7 +1,7 @@
 @echo off
+title DeployWorkstation Launcher v5.1
 REM ========================================================
-REM  DeployWorkstation.bat
-REM  Launcher for DeployWorkstation.ps1
+REM  DeployWorkstation.bat  -  Launcher for DeployWorkstation.ps1
 REM  Version 5.1 - PNWC Edition
 REM ========================================================
 
@@ -12,37 +12,40 @@ echo ===== DeployWorkstation Launcher v5.1 =====
 echo.
 
 REM --------------------------------------------------------
-REM  1) Elevation check - re-launch elevated if not admin
+REM  Elevation check - re-launch elevated if not admin
 REM --------------------------------------------------------
 net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo Requesting administrative privileges...
-    echo Please click "Yes" in the UAC prompt.
+    echo Please accept the UAC prompt.
     echo.
-    powershell.exe -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs -Wait"
-    exit /b
+    powershell.exe -NoProfile -Command "Start-Process cmd.exe -ArgumentList '/c "%~f0"' -Verb RunAs"
+    exit /b 0
 )
 
 echo [OK] Running as Administrator.
 echo.
 
 REM --------------------------------------------------------
-REM  2) Change to the directory containing this .bat
+REM  Change to the directory containing this .bat
 REM --------------------------------------------------------
 pushd "%~dp0"
 
 REM --------------------------------------------------------
-REM  3) Verify the PowerShell script is present
+REM  Verify the PowerShell script is present
 REM --------------------------------------------------------
 if not exist "DeployWorkstation.ps1" (
-    echo [ERROR] DeployWorkstation.ps1 not found.
-    echo         Expected: %~dp0DeployWorkstation.ps1
+    echo [ERROR] DeployWorkstation.ps1 not found in:
+    echo         %~dp0
     echo.
+    echo Both files must be in the same folder.
+    echo.
+    pause
     goto :error_exit
 )
 
 REM --------------------------------------------------------
-REM  4) Menu
+REM  Menu
 REM --------------------------------------------------------
 :menu
 echo Select deployment mode:
@@ -83,7 +86,7 @@ if "%choice%"=="1" (
 )
 
 REM --------------------------------------------------------
-REM  5) Show parameters then launch
+REM  Launch
 REM --------------------------------------------------------
 if "!ps_params!"=="" (
     echo     Parameters : (none - full run)
@@ -100,24 +103,19 @@ if "!ps_params!"=="" (
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File "DeployWorkstation.ps1" !ps_params!
 )
 
-REM Capture exit code immediately before anything can overwrite it
 set "ps_exit=%errorlevel%"
 
-REM --------------------------------------------------------
-REM  6) Result
-REM --------------------------------------------------------
 echo.
 if "%ps_exit%"=="0" (
     echo ===== Deployment completed successfully =====
 ) else (
     echo ===== Deployment finished with errors =====
-    echo     Exit code : %ps_exit%
-    echo     Check DeployWorkstation.log in this folder for details.
+    echo     Exit code  : %ps_exit%
+    echo     Log file   : %~dp0DeployWorkstation.log
 )
 
 goto :normal_exit
 
-REM --------------------------------------------------------
 :error_exit
 echo.
 echo ===== Launch aborted =====
@@ -125,7 +123,6 @@ popd
 pause
 exit /b 1
 
-REM --------------------------------------------------------
 :normal_exit
 popd
 echo.
