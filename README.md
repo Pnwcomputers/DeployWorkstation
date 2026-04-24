@@ -1,5 +1,9 @@
 # 🚀 DeployWorkstation Version5.1
 
+<p align="center">
+  <img src="assets/deployworkstation.png" alt="A PowerShell-based, automated provisioning solution that transforms a Windows 10 or Windows 11 workstation deployment process into a single plug-and-play operation." width="600"/>
+</p>
+
 ![Automation Level](https://img.shields.io/badge/Automation-Zero%20Touch-green)
 ![Windows Support](https://img.shields.io/badge/Windows-10%20%7C%2011-blue)
 ![PowerShell Version](https://img.shields.io/badge/PowerShell-5.1%2B-blue)
