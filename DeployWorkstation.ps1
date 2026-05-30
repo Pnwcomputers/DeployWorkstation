@@ -12,7 +12,8 @@ param(
     [string]$ReportPath,
     [switch]$SkipAppInstall,
     [switch]$SkipBloatwareRemoval,
-    [switch]$SkipSystemConfig
+    [switch]$SkipSystemConfig,
+    [switch]$UpdateApps
 )
 
 # ================================
@@ -40,6 +41,7 @@ if ($PSVersionTable.PSEdition -eq 'Core') {
     if ($SkipAppInstall)       { $params += '-SkipAppInstall' }
     if ($SkipBloatwareRemoval) { $params += '-SkipBloatwareRemoval' }
     if ($SkipSystemConfig)     { $params += '-SkipSystemConfig' }
+    if ($UpdateApps)           { $params += '-UpdateApps' }
     Start-Process -FilePath 'powershell.exe' -ArgumentList $params -Verb RunAs
     exit
 }
@@ -159,6 +161,17 @@ $script:Strings = @{
         ProgReportCollect = 'Collecting system info'
         ProgReportBuild   = 'Building report'
         ProgReportWrite   = 'Writing report file'
+
+        # Update mode
+        PhaseUpdate       = 'APP UPDATE'
+        ProgUpdate        = 'Updating Applications'
+        Updating          = 'Updating'
+        UpdateOK          = 'Updated'
+        AlreadyUpToDate   = 'Already up to date'
+        UpdateFail        = 'Update failed'
+        UpdateError       = 'Error updating'
+        SumAppsUpdated    = 'Apps updated'
+        SumAppsUpdateFail = 'App updates failed'
 
         # HTML report headings
         HtmlTitle         = 'DeployWorkstation Report'
@@ -298,6 +311,17 @@ $script:Strings = @{
         ProgReportBuild   = 'Construyendo informe'
         ProgReportWrite   = 'Escribiendo archivo de informe'
 
+        # Update mode
+        PhaseUpdate       = 'ACTUALIZACION DE APLICACIONES'
+        ProgUpdate        = 'Actualizando Aplicaciones'
+        Updating          = 'Actualizando'
+        UpdateOK          = 'Actualizado'
+        AlreadyUpToDate   = 'Ya esta actualizado'
+        UpdateFail        = 'Error en actualizacion'
+        UpdateError       = 'Error al actualizar'
+        SumAppsUpdated    = 'Aplicaciones actualizadas'
+        SumAppsUpdateFail = 'Actualizaciones fallidas'
+
         # HTML report headings
         HtmlTitle         = 'Informe de DeployWorkstation'
         HtmlGenerated     = 'Generado'
@@ -427,6 +451,8 @@ function Clear-PhaseProgress {
 $script:Summary = @{
     AppsInstalled       = 0
     AppsFailed          = 0
+    AppsUpdated         = 0
+    AppsUpdateFailed    = 0
     AppxRemoved         = 0
     CapabilitiesRemoved = 0
     McAfeeRemoved       = 0
@@ -435,6 +461,29 @@ $script:Summary = @{
 }
 
 $script:Results = [System.Collections.Generic.List[hashtable]]::new()
+
+# Applications managed by DeployWorkstation — used by both Install-StandardApps and Update-InstalledApps
+$script:ManagedApps = @(
+    # ---- Security & Maintenance ----
+    @{ Id = 'Malwarebytes.Malwarebytes';          Name = 'Malwarebytes'                  },
+    @{ Id = 'BleachBit.BleachBit';                Name = 'BleachBit'                     },
+
+    # ---- Browsers & Productivity ----
+    @{ Id = 'Google.Chrome';                      Name = 'Google Chrome'                 },
+    @{ Id = 'Adobe.Acrobat.Reader.64-bit';        Name = 'Adobe Acrobat Reader (64-bit)' },
+    @{ Id = '7zip.7zip';                          Name = '7-Zip'                         },
+    @{ Id = 'VideoLAN.VLC';                       Name = 'VLC Media Player'              },
+
+    # ---- .NET Runtimes ----
+    @{ Id = 'Microsoft.DotNet.Framework.4.8';     Name = '.NET Framework 4.8'            },
+    @{ Id = 'Microsoft.DotNet.DesktopRuntime.6';  Name = '.NET 6 Desktop Runtime'        },
+    @{ Id = 'Microsoft.DotNet.DesktopRuntime.7';  Name = '.NET 7 Desktop Runtime'        },
+    @{ Id = 'Microsoft.DotNet.DesktopRuntime.8';  Name = '.NET 8 Desktop Runtime'        },
+
+    # ---- Visual C++ Redistributables ----
+    @{ Id = 'Microsoft.VCRedist.2015+.x64';       Name = 'VC++ 2015-2022 Redist (x64)'  },
+    @{ Id = 'Microsoft.VCRedist.2015+.x86';       Name = 'VC++ 2015-2022 Redist (x86)'  }
+)
 
 function Add-Result {
     param(
@@ -867,27 +916,7 @@ function Install-StandardApps {
     $maxRetries    = 2
     $retryDelaySec = 10
 
-    $appsToInstall = @(
-        # ---- Security & Maintenance ----
-        @{ Id = 'Malwarebytes.Malwarebytes';          Name = 'Malwarebytes'                  },
-        @{ Id = 'BleachBit.BleachBit';                Name = 'BleachBit'                     },
-
-        # ---- Browsers & Productivity ----
-        @{ Id = 'Google.Chrome';                      Name = 'Google Chrome'                 },
-        @{ Id = 'Adobe.Acrobat.Reader.64-bit';        Name = 'Adobe Acrobat Reader (64-bit)' },
-        @{ Id = '7zip.7zip';                          Name = '7-Zip'                         },
-        @{ Id = 'VideoLAN.VLC';                       Name = 'VLC Media Player'              },
-
-        # ---- .NET Runtimes ----
-        @{ Id = 'Microsoft.DotNet.Framework.4.8';     Name = '.NET Framework 4.8'            },
-        @{ Id = 'Microsoft.DotNet.DesktopRuntime.6';  Name = '.NET 6 Desktop Runtime'        },
-        @{ Id = 'Microsoft.DotNet.DesktopRuntime.7';  Name = '.NET 7 Desktop Runtime'        },
-        @{ Id = 'Microsoft.DotNet.DesktopRuntime.8';  Name = '.NET 8 Desktop Runtime'        },
-
-        # ---- Visual C++ Redistributables ----
-        @{ Id = 'Microsoft.VCRedist.2015+.x64';       Name = 'VC++ 2015-2022 Redist (x64)'  },
-        @{ Id = 'Microsoft.VCRedist.2015+.x86';       Name = 'VC++ 2015-2022 Redist (x86)'  }
-    )
+    $appsToInstall = $script:ManagedApps
 
     $total   = $appsToInstall.Count
     $current = 0
@@ -970,6 +999,104 @@ function Install-StandardApps {
 
     Clear-PhaseProgress
     Write-Log "$(T 'PhaseApps'): $($script:Summary.AppsInstalled)/$total OK, $($script:Summary.AppsFailed) failed."
+}
+
+# ================================
+# App Update
+# ================================
+
+function Update-InstalledApps {
+    $alreadyUpToDateCode = -1978335189  # 0x8A15002B  No applicable upgrade found
+
+    $networkErrorCodes = @(
+        -1978334967,  # 0x8A150109  download failed
+        -1978334966,  # 0x8A15010A  winget network timeout
+        -2147012887,  # 0x80072EE9  connection reset by peer
+        -2147012873,  # 0x80072EF7  DNS name not resolved
+        -2147012867,  # 0x80072EFD  connection refused
+        -2147012889   # 0x80072EE7  InternetOpenUrl failed / WinHTTP unknown error
+    )
+
+    $maxRetries    = 2
+    $retryDelaySec = 10
+
+    $appsToUpdate = $script:ManagedApps
+    $total        = $appsToUpdate.Count
+    $current      = 0
+
+    foreach ($app in $appsToUpdate) {
+        $current++
+        Set-PhaseProgress -Activity (T 'ProgUpdate') `
+                          -Status   "$(T 'Updating'): $($app.Name) ($current/$total)" `
+                          -Current  $current -Total $total
+
+        Write-Log "$(T 'Updating'): $($app.Name)  [$($app.Id)]"
+        try {
+            $attempt   = 0
+            $exitCode  = -1
+            $wingetOut = $null
+
+            do {
+                $attempt++
+                $wingetOut = winget upgrade --id $app.Id --source winget `
+                    --accept-package-agreements --accept-source-agreements `
+                    --silent 2>&1
+                $exitCode = $LASTEXITCODE
+
+                if ($exitCode -eq 0 -or $exitCode -eq $alreadyUpToDateCode) { break }
+
+                if ($attempt -le $maxRetries -and $exitCode -in $networkErrorCodes) {
+                    Write-Log "$(T 'InstallRetrying') ($attempt/$maxRetries): $($app.Name) [exit $exitCode]" -Level 'WARN'
+                    Start-Sleep -Seconds $retryDelaySec
+                } else {
+                    break
+                }
+            } while ($true)
+
+            if ($exitCode -eq 0) {
+                Write-Log "$(T 'UpdateOK'): $($app.Name)" -Level 'SUCCESS'
+                Add-Result -Section (T 'PhaseUpdate') -Item $app.Name -Status 'OK' -Detail (T 'UpdateOK')
+                $script:Summary.AppsUpdated++
+            } elseif ($exitCode -eq $alreadyUpToDateCode) {
+                Write-Log "$(T 'AlreadyUpToDate'): $($app.Name)" -Level 'SUCCESS'
+                Add-Result -Section (T 'PhaseUpdate') -Item $app.Name -Status 'OK' -Detail (T 'AlreadyUpToDate')
+                $script:Summary.AppsUpdated++
+            } else {
+                $failReason = switch ($exitCode) {
+                    -1978335215 { 'Installer hash mismatch — retry later or check proxy/AV'     }
+                    -1978335212 { 'Package not found in winget source (ID may have changed)'     }
+                    -1978334960 { 'Installer blocked by security policy'                          }
+                    -1978335132 { 'Installer requires reboot before continuing'                   }
+                    -1978334967 { 'Network failure — download failed (all retries exhausted)'    }
+                    -1978334966 { 'Network failure — timed out (all retries exhausted)'          }
+                    -2147012887 { 'Network failure — connection reset (all retries exhausted)'   }
+                    -2147012873 { 'Network failure — DNS not resolved (all retries exhausted)'   }
+                    -2147012867 { 'Network failure — connection refused (all retries exhausted)' }
+                    -2147012889 { 'Network failure — WinHTTP error (all retries exhausted)'      }
+                    default     { "Exit code $exitCode" }
+                }
+                Write-Log "$(T 'UpdateFail'): $($app.Name) - $failReason" -Level 'WARN'
+                $diagLines = ($wingetOut | Where-Object { "$_".Trim() }) | Select-Object -Last 8
+                foreach ($line in $diagLines) {
+                    $clean = ("$line" -replace '[^ -~]', '').Trim()
+                    if ($clean.Length -lt 8)         { continue }
+                    if ($clean -match '^[\|/\-]+$')  { continue }
+                    if ($clean -match '^\s*\d+\s*MB') { continue }
+                    Write-Log "  $clean" -Level 'WARN'
+                }
+                Add-Result -Section (T 'PhaseUpdate') -Item $app.Name -Status 'WARN' -Detail $failReason
+                $script:Summary.AppsUpdateFailed++
+            }
+        }
+        catch {
+            Write-Log "$(T 'UpdateError') $($app.Name): $($_.Exception.Message)" -Level 'ERROR'
+            Add-Result -Section (T 'PhaseUpdate') -Item $app.Name -Status 'FAILED' -Detail $_.Exception.Message
+            $script:Summary.AppsUpdateFailed++
+        }
+    }
+
+    Clear-PhaseProgress
+    Write-Log "$(T 'PhaseUpdate'): $($script:Summary.AppsUpdated)/$total OK, $($script:Summary.AppsUpdateFailed) failed."
 }
 
 # ================================
@@ -1259,8 +1386,13 @@ function Write-ConsoleSummary {
     Write-Log $border -Level 'SECTION'
     Write-Log (T 'SumTitle') -Level 'SECTION'
     Write-Log $border -Level 'SECTION'
-    Write-Log "$( (T 'SumAppsOK')    ) : $($script:Summary.AppsInstalled)"
-    Write-Log "$( (T 'SumAppsFail')  ) : $($script:Summary.AppsFailed)"
+    if ($script:Summary.AppsUpdated -gt 0 -or $script:Summary.AppsUpdateFailed -gt 0) {
+        Write-Log "$( (T 'SumAppsUpdated')    ) : $($script:Summary.AppsUpdated)"
+        Write-Log "$( (T 'SumAppsUpdateFail') ) : $($script:Summary.AppsUpdateFailed)"
+    } else {
+        Write-Log "$( (T 'SumAppsOK')    ) : $($script:Summary.AppsInstalled)"
+        Write-Log "$( (T 'SumAppsFail')  ) : $($script:Summary.AppsFailed)"
+    }
     Write-Log "$( (T 'SumAppx')      ) : $($script:Summary.AppxRemoved)"
     Write-Log "$( (T 'SumCaps')      ) : $($script:Summary.CapabilitiesRemoved)"
     Write-Log "$( (T 'SumConfigOK')  ) : $($script:Summary.HardeningApplied)"
@@ -1307,11 +1439,19 @@ try {
     }
 
     if (-not $SkipAppInstall) {
-        Set-OverallProgress -Status (T 'PhaseApps') -Percent $script:PhasePct.AppsStart
-        Write-Log "=== $(T 'PhaseApps') ===" -Level 'SECTION'
-        Install-StandardApps
-        Set-OverallProgress -Status "$(T 'PhaseApps') - Complete" -Percent $script:PhasePct.AppsEnd
-        Write-Log "=== $(T 'PhaseApps') COMPLETE ===" -Level 'SUCCESS'
+        if ($UpdateApps) {
+            Set-OverallProgress -Status (T 'PhaseUpdate') -Percent $script:PhasePct.AppsStart
+            Write-Log "=== $(T 'PhaseUpdate') ===" -Level 'SECTION'
+            Update-InstalledApps
+            Set-OverallProgress -Status "$(T 'PhaseUpdate') - Complete" -Percent $script:PhasePct.AppsEnd
+            Write-Log "=== $(T 'PhaseUpdate') COMPLETE ===" -Level 'SUCCESS'
+        } else {
+            Set-OverallProgress -Status (T 'PhaseApps') -Percent $script:PhasePct.AppsStart
+            Write-Log "=== $(T 'PhaseApps') ===" -Level 'SECTION'
+            Install-StandardApps
+            Set-OverallProgress -Status "$(T 'PhaseApps') - Complete" -Percent $script:PhasePct.AppsEnd
+            Write-Log "=== $(T 'PhaseApps') COMPLETE ===" -Level 'SUCCESS'
+        }
     } else {
         Write-Log (T 'SkipApps')
     }
@@ -1328,7 +1468,7 @@ try {
 
     Write-ConsoleSummary
 
-    $overallStatus = if ($script:Summary.AppsFailed -gt 0 -or $script:Summary.HardeningFailed -gt 0) {
+    $overallStatus = if ($script:Summary.AppsFailed -gt 0 -or $script:Summary.HardeningFailed -gt 0 -or $script:Summary.AppsUpdateFailed -gt 0) {
         'WARNING'
     } else {
         'SUCCESS'

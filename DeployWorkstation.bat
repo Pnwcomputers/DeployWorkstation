@@ -18,7 +18,7 @@ if %errorlevel% neq 0 (
     echo Requesting administrative privileges...
     echo Please accept the UAC prompt.
     echo.
-    powershell.exe -NoProfile -Command "Start-Process cmd.exe -ArgumentList '/c "%~f0"' -Verb RunAs"
+    powershell.exe -NoProfile -Command "Start-Process cmd.exe -ArgumentList '/c ""%~f0""' -Verb RunAs"
     exit /b 0
 )
 
@@ -43,19 +43,18 @@ if not exist "DeployWorkstation.ps1" (
 )
 
 REM 5) Show options menu
+:menu
 echo Available options:
 echo   1. Full deployment (remove bloatware + install apps)
-
-
-
-
 echo   2. Remove bloatware only
 echo   3. Install apps only
-echo   4. Exit
+echo   4. System configuration only
+echo   5. Update installed apps
+echo   6. Exit
 
 echo.
 set "choice="
-set /p choice="Enter choice (1-5): "
+set /p choice="Enter choice (1-6): "
 
 
 REM 6) Set PowerShell parameters based on choice
@@ -67,19 +66,24 @@ if "%choice%"=="1" (
 
 ) else if "%choice%"=="2" (
     echo Running bloatware removal only...
-    set "ps_params=-SkipAppInstall"
+    set "ps_params=-SkipAppInstall -SkipSystemConfig"
 
 ) else if "%choice%"=="3" (
     echo Running app installation only...
-    set "ps_params=-SkipBloatwareRemoval"
+    set "ps_params=-SkipBloatwareRemoval -SkipSystemConfig"
 
 ) else if "%choice%"=="4" (
-    echo.
-    echo [*] System configuration only.
+    echo Running system configuration only...
     set "ps_params=-SkipBloatwareRemoval -SkipAppInstall"
+
 ) else if "%choice%"=="5" (
+    echo Updating installed apps...
+    set "ps_params=-SkipBloatwareRemoval -SkipSystemConfig -UpdateApps"
+
+) else if "%choice%"=="6" (
     echo Exiting.
     goto :normal_exit
+
 ) else (
     echo [!] Invalid choice - please try again.
     echo.
@@ -107,11 +111,10 @@ if "!ps_params!"=="" (
 REM 8) Check exit code and report results
 if %errorlevel% equ 0 (
     echo.
-
     echo ===== Deployment completed successfully =====
 ) else (
     echo ===== Deployment finished with errors =====
-    echo     Exit code  : %ps_exit%
+    echo     Exit code  : %errorlevel%
     echo     Log file   : %~dp0DeployWorkstation.log
 )
 
