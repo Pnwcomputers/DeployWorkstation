@@ -22,7 +22,6 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 - 🔁 **Network Retry Logic** — automatic retries with delay on transient network errors during installation
 - 🖥️ **Windows Edition Awareness** — detects Home vs. Pro/Enterprise and warns when policy keys will have no effect
 - 🗑️ **OEM OneDrive Removal** — three-path removal covering both Appx and embedded OEM binaries
-- 📊 **HTML Deployment Report** — self-contained post-run report with per-step pass/fail table, system info, and summary counts
 - 🌐 **Multi-Language Support** — auto-detects locale via `Get-Culture`; ships with `en-US` and `es-ES`
 - ✅ **Real-time Progress** — `Write-Progress` console bars throughout all major operations
 ## ✨ Key Features
