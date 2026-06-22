@@ -15,7 +15,7 @@
  
 A PowerShell-based, automated provisioning solution that transforms Windows 10 & 11 workstation deployment from a 30-step manual process into a single "plug-and-play" operation. Whether you're imaging bare metal, cleaning up an existing PC, or running routine maintenance on already-deployed machines, DeployWorkstation handles bloatware removal, essential application installation, and in-place app upgrades.
  
-## 🆕 What's New in v5.11
+## 🆕 What's New in v5.2
  
 - 🔄 **App Update Support** — detects and upgrades already-installed applications in-place; safe to re-run on existing machines
 - 🛡️ **Winget Auto-Bootstrap** — automatically downloads and installs winget on OEM machines where it's missing or outdated
@@ -24,6 +24,8 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 - 🗑️ **OEM OneDrive Removal** — three-path removal covering both Appx and embedded OEM binaries
 - 🌐 **Multi-Language Support** — auto-detects locale via `Get-Culture`; ships with `en-US` and `es-ES`
 - ✅ **Real-time Progress** — `Write-Progress` console bars throughout all major operations
+- 🐛 **Stability Fixes** — improved interactive menu logic, optimized HTML report generation, and robust winget version parsing
+
 ## ✨ Key Features
  
 - **🔐 Self-Elevating & Policy-Bypassing** — automatically relaunches under Windows PowerShell 5.1 with `-ExecutionPolicy Bypass` and UAC elevation
@@ -32,6 +34,7 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 - **📦 Standard App Installation & Upgrade** — automated install and in-place upgrade of essential third-party tools via WinGet
 - **💾 Offline Fallback Support** — bundles proprietary installers for network-independent deployment
 - **📋 Centralized Logging** — detailed operation logs plus an HTML report with pause-for-review functionality
+
 ## 🛡️ Automated Removal Capabilities
  
 ### UWP Applications Removed
@@ -47,6 +50,7 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 - 🎵 Groove Music
 - 📰 News & Weather Apps
 - 🗺️ Maps Application
+
 ### Legacy Features Disabled
 - 🆘 Quick Assist Remote Support
 - 🖥️ Remote Desktop Services
@@ -54,28 +58,33 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 - 🎮 Game Bar & Gaming Features
 - 📺 Windows Media Player Legacy
 - 🔍 Windows Search Indexing (Optional)
+
 ### Enterprise Software Removal
 - 🛡️ McAfee Security Suite
 - 🔒 Norton Antivirus
 - 📺 Bloatware Media Applications
 - 🎯 Manufacturer-Specific Utilities
 - 📊 Trial Software & Demos
+
 ## 📥 Essential Applications Installed
  
 ### Security & Maintenance
 - 🦠 **Malwarebytes** — premium malware protection
 - 🧹 **BleachBit** — system cleanup and privacy tool
 - 🔒 **Windows Defender** — enhanced configuration
+
 ### Productivity Suite
 - 🌐 **Google Chrome** — modern web browser
 - 🗜️ **7-Zip** — universal archive manager
 - 📄 **Adobe Acrobat Reader DC** — PDF viewer
 - 📹 **VLC Media Player** — universal media player
 - 📝 **Notepad++** — advanced text editor
+
 ### Development Runtimes
 - ⚙️ **.NET Framework 4.8** — legacy app compatibility
 - ⚙️ **.NET Desktop Runtime 6 / 7 / 8** — modern app support
 - 🔧 **Visual C++ 2015–2022 Redistributables** (x64 & x86)
+
 ## 🚀 Installation & Usage
  
 ### Prerequisites
@@ -83,6 +92,7 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 - 🌐 Internet Connection (for WinGet packages — winget auto-installs if missing)
 - 👤 Administrator Access
 - 💾 USB Drive or Network Share (Optional)
+
 ### Quick Start
  
 1. **📥 Download the Repository**
@@ -94,13 +104,13 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 2. **💾 Prepare Deployment Media**
    ```cmd
    copy DeployWorkstation.ps1 E:\
-   copy DeployWorkstation.bat E:\
+   copy QuickStart.cmd E:\
    ```
  
 3. **▶️ Execute Deployment**
    ```cmd
-   # Method 1: Double-click the .bat launcher (recommended)
-   DeployWorkstation.bat
+   # Method 1: Double-click the .cmd launcher (recommended)
+   QuickStart.cmd
  
    # Method 2: Direct PowerShell execution
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\DeployWorkstation.ps1
@@ -114,14 +124,16 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
    | **2 — Bloatware Removal Only** | Skips app installation |
    | **3 — App Installation Only** | Skips bloatware removal |
    | **4 — System Config Only** | Registry/policy hardening only |
+
 5. **✅ Review & Reboot**
    - Script pauses for final review on completion
    - HTML report generated: `DeployWorkstation.html`
    - Detailed log available: `DeployWorkstation.log`
    - System reboot recommended for a clean finish
+
 ### Re-Running on Existing Machines
  
-v5.11 is safe to run on already-deployed workstations. The upgrade logic updates any managed apps with newer versions available via winget.
+v5.2 is safe to run on already-deployed workstations. The upgrade logic updates any managed apps with newer versions available via winget.
  
 ```powershell
 # Re-run for app updates only (skip bloatware removal on a previously cleaned machine)
@@ -142,6 +154,7 @@ v5.11 is safe to run on already-deployed workstations. The upgrade logic updates
 | `-SkipDefaultUserConfig` | Skip default user profile configuration |
 | `-SkipSystemConfig` | Skip registry/policy hardening |
 | `-SkipJavaRuntimes` | Skip Java runtime installation |
+| `-UpdateApps` | Force in-place update checks for existing applications |
 | `-ExportWingetApps` | Export currently installed winget apps to `apps.json` |
 | `-ImportWingetApps` | Import and install apps from `apps.json` |
 | `-DryRun` | Simulate all actions without making changes |
@@ -217,20 +230,24 @@ $LogRetention = 30       # Days to keep logs
 - Hardware refresh projects
 - Standardized corporate imaging
 - Remote office provisioning
+
 ### **🔧 IT Service Providers**
 - Client workstation deployment and routine maintenance
 - Malware cleanup and rebuild
 - Hardware upgrade services
 - Maintenance contract fulfillment — re-run to keep apps current
+
 ### **🏫 Educational Institutions**
 - Lab computer preparation
 - Student workstation imaging
 - Faculty equipment setup
 - Semester refresh operations
+
 ### **🏠 Home & Small Business**
 - Personal computer setup
 - Family PC maintenance
 - Small office standardization
+
 ## 🔍 Troubleshooting
  
 ### Common Issues
@@ -239,18 +256,22 @@ $LogRetention = 30       # Days to keep logs
 - Ensure PowerShell execution policy allows scripts
 - Verify UAC elevation is working
 - Check Windows PowerShell 5.1 is available
+
 **WinGet installation failures**
 - The script will attempt to auto-install/repair winget on OEM machines
 - Verify internet connectivity if bootstrap also fails
 - Update Windows to latest version
+
 **Bloatware returns after reboot**
 - Run script as Administrator
 - Ensure all user profiles are processed
 - Check Group Policy restrictions
+
 **Offline installers not found**
 - Verify installer paths in script
 - Check file permissions on USB drive
 - Ensure installers support silent installation
+
 ### Log Analysis
 ```powershell
 # Check for errors and warnings in the deployment log
@@ -267,7 +288,7 @@ The HTML report (`DeployWorkstation.html`) provides the same information in a re
 ```text
 DeployWorkstation/
 ├── DeployWorkstation.ps1      # Main PowerShell script
-├── DeployWorkstation.bat      # Self-elevating launcher with menu
+├── QuickStart.cmd             # Self-elevating launcher with menu
 ├── Installers/                # Offline installer directory
 │   ├── CustomApp1.msi
 │   └── CustomApp2.exe
@@ -288,6 +309,7 @@ DeployWorkstation/
 - 🚀 Cloud Configuration Sync
 - 🚀 Windows Server Hardening Mode (no app install)
 - 📊 Analytics & Telemetry (CSV/JSON export for fleet tracking)
+
 ## 🤝 Contributing
  
 We welcome contributions! Here's how to get started:
@@ -296,6 +318,7 @@ We welcome contributions! Here's how to get started:
 - **🐛 Bug Reports** — open issues with detailed descriptions, system info, and log excerpts
 - **💡 Feature Requests** — open issues with `[FEATURE]` tag, describe use case and benefits
 - **🔒 Security Issues** — email [support@pnwcomputers.com](mailto:support@pnwcomputers.com) with proof of concept; allow reasonable disclosure time
+
 ## 📄 License
  
 This project is licensed under the MIT License — see the [LICENSE](LICENSE.md) file for details.
@@ -306,6 +329,7 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE.md)
 - 🐛 **Bug Reports**: Open an issue on GitHub
 - 💡 **Feature Requests**: Open an issue with `[FEATURE]` tag
 - 💬 **General Support**: [support@pnwcomputers.com](mailto:support@pnwcomputers.com)
+
 ---
  
 ## 📊 Statistics
@@ -322,5 +346,5 @@ Built with ❤️ for efficiency, reliability, and zero-touch automation.
 [⭐ Star this repo](https://github.com/Pnwcomputers/DeployWorkstation) if it saved you time and effort!
  
 ---
- 
-*Tested on Windows 10 (1909+) and Windows 11 — Enterprise, Pro, and Home editions*
+*Updated June 2026*
+*Tested on Windows 10 (1909+) and Windows 11 — Enterprise, Pro, and Home Editions*
