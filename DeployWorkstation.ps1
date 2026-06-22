@@ -1,5 +1,5 @@
 # DeployWorkstation.ps1 – Optimized Win10/11 Setup & Clean-up
-# Version: 5.11 – PNWC Edition 4.1.2026
+# Version: 5.2 – PNWC Edition 6.22.2026
 # New in 5.0:  Write-Progress console bars, embedded en-US / es-ES localization
 # New in 5.1:  Winget auto-bootstrap, install retry logic, WU guard, OEM OneDrive, edition awareness
 # New in 5.11: App update mode (-UpdateApps), startup banner
