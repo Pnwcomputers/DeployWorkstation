@@ -1,4 +1,5 @@
-# 🚀 DeployWorkstation: Automated Windows Deployment Utility
+# 🚀 DeployWorkstation: 
+# Automated Windows New Computer/User Account Setup & POST Install Update Utility
 
 <p align="center">
   <img src="assets/deployworkstation.png" alt="A PowerShell-based, automated provisioning solution that transforms a Windows 10 or Windows 11 workstation deployment process into a single plug-and-play operation." width="600"/>
