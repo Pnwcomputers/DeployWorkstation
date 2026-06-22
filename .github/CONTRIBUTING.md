@@ -93,4 +93,3 @@ Contributors will be recognized in:
 - GitHub contributors page
 
 Thank you for helping make DeployWorkstation better!
-EOF

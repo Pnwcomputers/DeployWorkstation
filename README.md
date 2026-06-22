@@ -294,7 +294,9 @@ DeployWorkstation/
 ├── docs/
 │   ├── CONFIGURATION.md
 │   ├── INSTALLATION.md
-│   └── TROUBLESHOOTING.md
+│   ├── TROUBLESHOOTING.md
+│   ├── FAQ.md
+│   └── COMPATABILITY.md
 └── tests/
     └── DeployWorkstation.Tests.ps1
 ```

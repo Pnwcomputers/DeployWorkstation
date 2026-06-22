@@ -1348,7 +1348,7 @@ function Export-HtmlReport {
   <div class="info-card"><div class="label">$lRAM</div><div class="value">$ramGB GB</div></div>
   <div class="info-card"><div class="label">$lUptime</div><div class="value">$uptimeHrs $lHrs</div></div>
   <div class="info-card"><div class="label">$lRunTime</div><div class="value">$durationFmt</div></div>
-  <div class="info-card"><div class="label">$lVersion</div><div class="value">5.11</div></div>
+  <div class="info-card"><div class="label">$lVersion</div><div class="value">5.2</div></div>
   <div class="info-card"><div class="label">$lTechnician</div><div class="value">PNWC</div></div>
 </div>
 

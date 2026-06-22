@@ -2,7 +2,7 @@
 name: Bug report
 about: Create a report to help us improve
 title: ''
-labels: ''
+labels: bug
 assignees: Pnwcomputers
 
 ---
@@ -12,27 +12,24 @@ A clear and concise description of what the bug is.
 
 **To Reproduce**
 Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+1. Run script with these parameters: `...`
+2. See error
 
 **Expected behavior**
 A clear and concise description of what you expected to happen.
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+**System information**
+ - OS: [e.g. Windows 11 Pro 23H2]
+ - PowerShell: [e.g. 5.1.26100.2161]
+ - Script version: [e.g. v5.2]
+ - Winget version: [e.g. 1.9.25200]
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
+**Log excerpt**
+Paste the relevant lines from `DeployWorkstation.log` (or attach the full log file).
 
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone6]
- - OS: [e.g. iOS8.1]
- - Browser [e.g. stock browser, safari]
- - Version [e.g. 22]
+```
+[paste log here]
+```
 
 **Additional context**
-Add any other context about the problem here.
+Add any other context about the problem here (hardware, domain vs. workgroup, VPN, proxy, etc.).
