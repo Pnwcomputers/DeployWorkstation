@@ -37,18 +37,18 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 
 ## ✨ Key Features
  
-- **🔐 Self-Elevating & Policy-Bypassing** - automatically relaunches under Windows PowerShell 5.1 with `-ExecutionPolicy Bypass` and UAC elevation
-- **🗑️ UWP "Bloatware" Purge** - comprehensive removal of built-in apps including Copilot, Teams, New Outlook, Clipchamp, OneDrive, Xbox, and more
-- **⚙️ Win32/MSI Removal & DISM Cleanup** - enterprise software removal via WinGet, DISM, and registry manipulation
-- **📦 Standard App Installation & Upgrade** - automated install and in-place upgrade of essential third-party tools via WinGet
-- **💾 Offline Fallback Support** - bundles proprietary installers for network-independent deployment
-- **📋 Centralized Logging** - detailed operation logs plus an HTML report with pause-for-review functionality
-- **🔄 App Update Support** - detects and upgrades already-installed applications in-place; safe to re-run on existing machines
-- **🛡️ Winget Auto-Bootstrap** - automatically downloads and installs winget on OEM machines where it's missing or outdated
-- **🔁 Network Retry Logic** - automatic retries with delay on transient network errors during installation
-- **🖥️ Windows Edition Awareness** - detects Home vs. Pro/Enterprise and warns when policy keys will have no effect
-- **🗑️ OEM OneDrive Removal** - three-path removal covering both Appx and embedded OEM binaries
-- **🌐 Multi-Language Support** - auto-detects locale via `Get-Culture`; ships with `en-US` and `es-ES`
+- **🔐 Self-Elevating & Policy-Bypassing** - Automatically relaunches under Windows PowerShell 5.1 with `-ExecutionPolicy Bypass` and UAC elevation
+- **🗑️ UWP "Bloatware" Purge** - Comprehensive removal of built-in apps including Copilot, Teams, New Outlook, Clipchamp, OneDrive, Xbox, and more
+- **⚙️ Win32/MSI Removal & DISM Cleanup** - Enterprise software removal via WinGet, DISM, and registry manipulation
+- **📦 Standard App Installation & Upgrade** - Automated install and in-place upgrade of essential third-party tools via WinGet
+- **💾 Offline Fallback Support** - Bundles proprietary installers for network-independent deployment
+- **📋 Centralized Logging** - Detailed operation logs plus an HTML report with pause-for-review functionality
+- **🔄 App Update Support** - Detects and upgrades already-installed applications in-place; safe to re-run on existing machines
+- **🛡️ Winget Auto-Bootstrap** - Automatically downloads and installs winget on OEM machines where it's missing or outdated
+- **🔁 Network Retry Logic** - Automatic retries with delay on transient network errors during installation
+- **🖥️ Windows Edition Awareness** - Detects Home vs. Pro/Enterprise and warns when policy keys will have no effect
+- **🗑️ OEM OneDrive Removal** - Three-path removal covering both Appx and embedded OEM binaries
+- **🌐 Multi-Language Support** - Auto-detects locale via `Get-Culture`; ships with `en-US` and `es-ES`
 - **✅ Real-time Progress** - `Write-Progress` console bars throughout all major operations
 
 ## 🛡️ Automated Removal Capabilities
