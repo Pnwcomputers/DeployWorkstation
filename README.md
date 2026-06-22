@@ -1,4 +1,4 @@
-# 🚀 DeployWorkstation - Automated Setup & Update Windows Utility
+# 🚀 DeployWorkstation- Automated Setup & Update Windows Utility
 
 <p align="center">
   <img src="assets/deployworkstation.png" alt="A PowerShell-based, automated provisioning solution that transforms a Windows 10 or Windows 11 workstation deployment process into a single plug-and-play operation." width="600"/>
@@ -19,17 +19,17 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 
 | # | File | Issue | Fix |
 |---|------|-------|-----|
-| 1 | `QuickStart.cmd` | All 4 menu options passed `-ConfigFile` — a parameter that doesn't exist in the PS1. Every choice errored immediately. | Rewrote to use the actual `-SkipBloatwareRemoval`, `-SkipAppInstall`, `-SkipSystemConfig`, and `-UpdateApps` params. |
+| 1 | `QuickStart.cmd` | All 4 menu options passed `-ConfigFile` - a parameter that doesn't exist in the PS1. Every choice errored immediately. | Rewrote to use the actual `-SkipBloatwareRemoval`, `-SkipAppInstall`, `-SkipSystemConfig`, and `-UpdateApps` params. |
 | 2 | `QuickStart.cmd` | `goto start` on invalid input → no `:start` label existed → `cmd.exe` crashed the script. | Added `:start` label at the top of the menu block. |
-| 3 | `tests/DeployWorkstation.Tests.ps1:42` | Test asserted `DeployWorkstation.cmd` exists — it never did — permanent CI failure. | Changed to check `QuickStart.cmd` which actually exists. |
+| 3 | `tests/DeployWorkstation.Tests.ps1:42` | Test asserted `DeployWorkstation.cmd` exists - it never did - permanent CI failure. | Changed to check `QuickStart.cmd` which actually exists. |
 | 4 | `.github/workflows/test-powershell.yml:37` | `upload-artifact@v3` was deprecated and removed by GitHub. | Upgraded to `@v4`. |
-| 5 | `DeployWorkstation.ps1:587` | `winget --version` can output multiple lines; `-replace` on an array returns an array; `[Version]` cast on an array throws and silently skips the minimum version check. | Added `Where-Object` + `Select-Object -Last 1` before the replace. |
+| 5 | `DeployWorkstation.ps1:587` | `winget--version` can output multiple lines; `-replace` on an array returns an array; `[Version]` cast on an array throws and silently skips the minimum version check. | Added `Where-Object` + `Select-Object-Last 1` before the replace. |
 
 ### Code Quality Updates/Fixes:
 
 | # | File | Issue | Fix |
 |---|------|-------|-----|
-| 6 | `DeployWorkstation.ps1:529` | `Set-ExecutionPolicy` was placed mid-file after all function definitions — if it threw, the machine would be left partially configured. | Moved to line 26, right after `$ProgressPreference`. |
+| 6 | `DeployWorkstation.ps1:529` | `Set-ExecutionPolicy` was placed mid-file after all function definitions - if it threw, the machine would be left partially configured. | Moved to line 26, right after `$ProgressPreference`. |
 | 7 | `DeployWorkstation.ps1:535` | `$script:IsWin11` computed but never referenced anywhere. | Removed. |
 | 8 | `Export-HtmlReport` | Called `Get-CimInstance Win32_OperatingSystem` a second time at report generation, even though it was already cached as `$script:OsInfo`. | Replaced with `$script:OsInfo`. |
 
@@ -37,19 +37,19 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 
 ## ✨ Key Features
  
-- **🔐 Self-Elevating & Policy-Bypassing** — automatically relaunches under Windows PowerShell 5.1 with `-ExecutionPolicy Bypass` and UAC elevation
-- **🗑️ UWP "Bloatware" Purge** — comprehensive removal of built-in apps including Copilot, Teams, New Outlook, Clipchamp, OneDrive, Xbox, and more
-- **⚙️ Win32/MSI Removal & DISM Cleanup** — enterprise software removal via WinGet, DISM, and registry manipulation
-- **📦 Standard App Installation & Upgrade** — automated install and in-place upgrade of essential third-party tools via WinGet
-- **💾 Offline Fallback Support** — bundles proprietary installers for network-independent deployment
-- **📋 Centralized Logging** — detailed operation logs plus an HTML report with pause-for-review functionality
-- **🔄 App Update Support** — detects and upgrades already-installed applications in-place; safe to re-run on existing machines
-- **🛡️ Winget Auto-Bootstrap** — automatically downloads and installs winget on OEM machines where it's missing or outdated
-- **🔁 Network Retry Logic** — automatic retries with delay on transient network errors during installation
-- **🖥️ Windows Edition Awareness** — detects Home vs. Pro/Enterprise and warns when policy keys will have no effect
-- **🗑️ OEM OneDrive Removal** — three-path removal covering both Appx and embedded OEM binaries
-- **🌐 Multi-Language Support** — auto-detects locale via `Get-Culture`; ships with `en-US` and `es-ES`
-- **✅ Real-time Progress** — `Write-Progress` console bars throughout all major operations
+- **🔐 Self-Elevating & Policy-Bypassing** - automatically relaunches under Windows PowerShell 5.1 with `-ExecutionPolicy Bypass` and UAC elevation
+- **🗑️ UWP "Bloatware" Purge** - comprehensive removal of built-in apps including Copilot, Teams, New Outlook, Clipchamp, OneDrive, Xbox, and more
+- **⚙️ Win32/MSI Removal & DISM Cleanup** - enterprise software removal via WinGet, DISM, and registry manipulation
+- **📦 Standard App Installation & Upgrade** - automated install and in-place upgrade of essential third-party tools via WinGet
+- **💾 Offline Fallback Support** - bundles proprietary installers for network-independent deployment
+- **📋 Centralized Logging** - detailed operation logs plus an HTML report with pause-for-review functionality
+- **🔄 App Update Support** - detects and upgrades already-installed applications in-place; safe to re-run on existing machines
+- **🛡️ Winget Auto-Bootstrap** - automatically downloads and installs winget on OEM machines where it's missing or outdated
+- **🔁 Network Retry Logic** - automatic retries with delay on transient network errors during installation
+- **🖥️ Windows Edition Awareness** - detects Home vs. Pro/Enterprise and warns when policy keys will have no effect
+- **🗑️ OEM OneDrive Removal** - three-path removal covering both Appx and embedded OEM binaries
+- **🌐 Multi-Language Support** - auto-detects locale via `Get-Culture`; ships with `en-US` and `es-ES`
+- **✅ Real-time Progress** - `Write-Progress` console bars throughout all major operations
 
 ## 🛡️ Automated Removal Capabilities
  
@@ -85,27 +85,27 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 ## 📥 Essential Applications Installed
  
 ### Security & Maintenance
-- 🦠 **Malwarebytes** — premium malware protection
-- 🧹 **BleachBit** — system cleanup and privacy tool
-- 🔒 **Windows Defender** — enhanced configuration
+- 🦠 **Malwarebytes** - Decent free Malware protection
+- 🧹 **BleachBit** - System cleanup and privacy tool
+- 🔒 **Windows Defender** - Enhanced configuration
 
 ### Productivity Suite
-- 🌐 **Google Chrome** — modern web browser
-- 🗜️ **7-Zip** — universal archive manager
-- 📄 **Adobe Acrobat Reader DC** — PDF viewer
-- 📹 **VLC Media Player** — universal media player
-- 📝 **Notepad++** — advanced text editor
+- 🌐 **Google Chrome** - Modern web browser
+- 🗜️ **7-Zip** - Universal archive manager
+- 📄 **Adobe Acrobat Reader DC** - PDF viewer
+- 📹 **VLC Media Player** - Universal media player
+- 📝 **Notepad++** - Advanced text editor
 
 ### Development Runtimes
-- ⚙️ **.NET Framework 4.8** — legacy app compatibility
-- ⚙️ **.NET Desktop Runtime 6 / 7 / 8** — modern app support
+- ⚙️ **.NET Framework 4.8** - Legacy app compatibility
+- ⚙️ **.NET Desktop Runtime 6 / 7 / 8** - Modern app support
 - 🔧 **Visual C++ 2015–2022 Redistributables** (x64 & x86)
 
 ## 🚀 Installation & Usage
  
 ### Prerequisites
-- 💻 Windows 10/11 (Any Edition)
-- 🌐 Internet Connection (for WinGet packages — winget auto-installs if missing)
+- 💻 Windows 10/11 (Most Editions)
+- 🌐 Internet Connection (for WinGet packages - Winget auto-installs if missing)
 - 👤 Administrator Access
 - 💾 USB Drive or Network Share (Optional)
 
@@ -129,23 +129,23 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
    QuickStart.cmd
  
    # Method 2: Direct PowerShell execution
-   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\DeployWorkstation.ps1
+   powershell.exe-NoProfile-ExecutionPolicy Bypass-File .\DeployWorkstation.ps1
    ```
  
 4. **⏳ Select Deployment Mode**
    The launcher presents four options:
    | Option | Description |
    |--------|-------------|
-   | **1 — Full Deployment** | Bloatware removal + app install + system config |
-   | **2 — Bloatware Removal Only** | Skips app installation |
-   | **3 — App Installation Only** | Skips bloatware removal |
-   | **4 — System Config Only** | Registry/policy hardening only |
+   | **1 - Full Deployment** | Bloatware removal + app install + system config |
+   | **2 - Bloatware Removal Only** | Skips app installation |
+   | **3 - App Installation Only** | Skips bloatware removal |
+   | **4 - System Config Only** | Registry/policy hardening only |
 
 5. **✅ Review & Reboot**
-   - Script pauses for final review on completion
-   - HTML report generated: `DeployWorkstation.html`
-   - Detailed log available: `DeployWorkstation.log`
-   - System reboot recommended for a clean finish
+  - Script pauses for final review on completion
+  - HTML report generated: `DeployWorkstation.html`
+  - Detailed log available: `DeployWorkstation.log`
+  - System reboot recommended for a clean finish
 
 ### Re-Running on Existing Machines
  
@@ -153,10 +153,10 @@ v5.2 is safe to run on already-deployed workstations. The upgrade logic updates 
  
 ```powershell
 # Re-run for app updates only (skip bloatware removal on a previously cleaned machine)
-.\DeployWorkstation.ps1 -SkipBloatwareRemoval
+.\DeployWorkstation.ps1-SkipBloatwareRemoval
  
 # Dry-run to preview what would change without making any modifications
-.\DeployWorkstation.ps1 -DryRun
+.\DeployWorkstation.ps1-DryRun
 ```
  
 ## 🔧 Advanced Configuration
@@ -251,7 +251,7 @@ $LogRetention = 30       # Days to keep logs
 - Client workstation deployment and routine maintenance
 - Malware cleanup and rebuild
 - Hardware upgrade services
-- Maintenance contract fulfillment — re-run to keep apps current
+- Maintenance contract fulfillment - re-run to keep apps current
 
 ### **🏫 Educational Institutions**
 - Lab computer preparation
@@ -294,10 +294,10 @@ $LogRetention = 30       # Days to keep logs
 Get-Content .\DeployWorkstation.log | Select-String "ERROR|WARNING"
  
 # Verify WinGet package status
-winget list --source winget
+winget list--source winget
 ```
  
-The HTML report (`DeployWorkstation.html`) provides the same information in a readable format — open it in any browser after the run completes.
+The HTML report (`DeployWorkstation.html`) provides the same information in a readable format - open it in any browser after the run completes.
  
 ## 🛠️ Project Structure
  
@@ -330,14 +330,14 @@ DeployWorkstation/
  
 We welcome contributions! Here's how to get started:
  
-- **📖 Documentation** — improve README clarity, add configuration examples, create troubleshooting guides
-- **🐛 Bug Reports** — open issues with detailed descriptions, system info, and log excerpts
-- **💡 Feature Requests** — open issues with `[FEATURE]` tag, describe use case and benefits
-- **🔒 Security Issues** — email [support@pnwcomputers.com](mailto:support@pnwcomputers.com) with proof of concept; allow reasonable disclosure time
+- **📖 Documentation** - Improve README clarity, add configuration examples, create troubleshooting guides
+- **🐛 Bug Reports** - Open issues with detailed descriptions, system info, and log excerpts
+- **💡 Feature Requests** - Open issues with `[FEATURE]` tag, describe use case and benefits
+- **🔒 Security Issues** - Email [support@pnwcomputers.com](mailto:support@pnwcomputers.com) with proof of concept; allow reasonable disclosure time
 
 ## 📄 License
  
-This project is licensed under the MIT License — see the [LICENSE](LICENSE.md) file for details.
+This project is licensed under the MIT License - See the [LICENSE](LICENSE.md) file for details.
  
 ## 📞 Support & Contact
  
@@ -355,7 +355,7 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE.md)
 ![GitHub issues](https://img.shields.io/github/issues/Pnwcomputers/DeployWorkstation)
 ![GitHub license](https://img.shields.io/github/license/Pnwcomputers/DeployWorkstation)
  
-**🎯 Transform your Windows deployment process from hours to minutes — and keep it current with every re-run.**
+**🎯 Transform your Windows deployment process from hours to minutes, and keep it current with every re-run.**
  
 Built with ❤️ for efficiency, reliability, and zero-touch automation.
  
@@ -363,4 +363,4 @@ Built with ❤️ for efficiency, reliability, and zero-touch automation.
  
 ---
 *Updated June 2026*
-*Tested on Windows 10 (1909+) and Windows 11 — Enterprise, Pro, and Home Editions*
+*Tested on Windows 10 (1909+) and Windows 11 - Pro & Home Editions*
