@@ -12,7 +12,7 @@
 ![GitHub issues](https://img.shields.io/github/issues/Pnwcomputers/DeployWorkstation)
 ![Maintenance](https://img.shields.io/badge/Maintained-Yes-green)
 
-**Zero-Touch Windows Workstation Provisioning & Maintenance Toolkit**
+### **Zero-Touch Windows Workstation Provisioning & Maintenance Toolkit**
  
 A PowerShell-based, automated provisioning solution that transforms Windows 10 & 11 workstation deployment from a 30-step manual process into a single "plug-and-play" operation. Whether you're imaging bare metal, cleaning up an existing PC, or running routine maintenance on already-deployed machines, DeployWorkstation handles bloatware removal, essential application installation, and in-place app upgrades.
  
