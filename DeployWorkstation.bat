@@ -2,7 +2,7 @@
 title DeployWorkstation Launcher v5.2
 REM ========================================================
 REM  DeployWorkstation.bat  -  Launcher for DeployWorkstation.ps1
-REM  Version 5.11 - PNWC Edition 4.1.2026
+REM  Version 5.2 - PNWC Edition 6.22.2026
 REM ========================================================
 
 setlocal enabledelayedexpansion

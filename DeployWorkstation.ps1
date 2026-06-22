@@ -3,6 +3,8 @@
 # New in 5.0:  Write-Progress console bars, embedded en-US / es-ES localization
 # New in 5.1:  Winget auto-bootstrap, install retry logic, WU guard, OEM OneDrive, edition awareness
 # New in 5.11: App update mode (-UpdateApps), startup banner
+# New in 5.2:  Updated .NET runtimes (8 LTS + 10 LTS); bug fixes in QuickStart.cmd,
+#              winget version detection, CI workflow; code quality improvements
 
 #Requires -Version 5.1
 #Requires -RunAsAdministrator

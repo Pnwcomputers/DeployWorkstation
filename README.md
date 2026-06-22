@@ -42,8 +42,7 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 - **🗑️ UWP "Bloatware" Purge** - Comprehensive removal of built-in apps including Copilot, Teams, New Outlook, Clipchamp, OneDrive, Xbox, and more
 - **⚙️ Win32/MSI Removal & DISM Cleanup** - Enterprise software removal via WinGet, DISM, and registry manipulation
 - **📦 Standard App Installation & Upgrade** - Automated install and in-place upgrade of essential third-party tools via WinGet
-- **💾 Offline Fallback Support** - Bundles proprietary installers for network-independent deployment
-- **📋 Centralized Logging** - Detailed operation logs plus an HTML report with pause-for-review functionality
+- **📋 Centralized Logging** - Detailed operation logs plus a dark-themed HTML report with system info summary and full event log
 - **🔄 App Update Support** - Detects and upgrades already-installed applications in-place; safe to re-run on existing machines
 - **🛡️ Winget Auto-Bootstrap** - Automatically downloads and installs winget on OEM machines where it's missing or outdated
 - **🔁 Network Retry Logic** - Automatic retries with delay on transient network errors during installation
@@ -55,7 +54,7 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 ## 🛡️ Automated Removal Capabilities
  
 ### UWP Applications Removed
-- 📧 New Outlook & Mail
+- 📧 New Outlook (Microsoft.OutlookForWindows)
 - 🤖 Copilot Assistant
 - 👥 Microsoft Teams (Consumer)
 - 🎬 Clipchamp Video Editor
@@ -64,42 +63,40 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 - 💼 LinkedIn Integration
 - 📞 Skype for Windows
 - 🎮 Xbox Gaming Suite
-- 🎵 Groove Music
-- 📰 News & Weather Apps
-- 🗺️ Maps Application
+- 🥽 Mixed Reality Portal
+- 🖥️ Remote Desktop App
+- 🆘 Quick Assist
 
-### Legacy Features Disabled
-- 🆘 Quick Assist Remote Support
-- 🖥️ Remote Desktop Services
-- 🥽 Mixed Reality Platform
-- 🎮 Game Bar & Gaming Features
-- 📺 Windows Media Player Legacy
-- 🔍 Windows Search Indexing (Optional)
+### Windows Capabilities Removed
+- 🆘 Quick Assist capability
+- 🎮 Xbox TCUI, Game Overlay & Speech-to-Text overlays
+- 🔑 OpenSSH Client
 
 ### Enterprise Software Removal
-- 🛡️ McAfee Security Suite
-- 🔒 Norton Antivirus
-- 📺 Bloatware Media Applications
-- 🎯 Manufacturer-Specific Utilities
-- 📊 Trial Software & Demos
+- 🛡️ McAfee Security Suite (registry-based uninstall)
+
+### Privacy & Telemetry Hardening
+- Disables Windows telemetry collection
+- Disables Windows Error Reporting
+- Disables CEIP (Customer Experience Improvement Program)
+- Disables Advertising ID
 
 ## 📥 Essential Applications Installed
  
 ### Security & Maintenance
-- 🦠 **Malwarebytes** - Decent free Malware protection
+- 🦠 **Malwarebytes** - Malware protection
 - 🧹 **BleachBit** - System cleanup and privacy tool
-- 🔒 **Windows Defender** - Enhanced configuration
 
 ### Productivity Suite
-- 🌐 **Google Chrome** - Modern web browser
+- 🌐 **Google Chrome** - Web browser
 - 🗜️ **7-Zip** - Universal archive manager
-- 📄 **Adobe Acrobat Reader DC** - PDF viewer
+- 📄 **Adobe Acrobat Reader DC** (64-bit) - PDF viewer
 - 📹 **VLC Media Player** - Universal media player
-- 📝 **Notepad++** - Advanced text editor
 
 ### Development Runtimes
 - ⚙️ **.NET Framework 4.8** - Legacy app compatibility
-- ⚙️ **.NET Desktop Runtime 6 / 7 / 8** - Modern app support
+- ⚙️ **.NET 8 Desktop Runtime** - LTS, supported through November 2026
+- ⚙️ **.NET 10 Desktop Runtime** - LTS, supported through November 2030
 - 🔧 **Visual C++ 2015–2022 Redistributables** (x64 & x86)
 
 ## 🚀 Installation & Usage
@@ -121,26 +118,30 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 2. **💾 Prepare Deployment Media**
    ```cmd
    copy DeployWorkstation.ps1 E:\
-   copy QuickStart.cmd E:\
+   copy DeployWorkstation.bat E:\
    ```
- 
+
 3. **▶️ Execute Deployment**
    ```cmd
-   # Method 1: Double-click the .cmd launcher (recommended)
-   QuickStart.cmd
- 
-   # Method 2: Direct PowerShell execution
-   powershell.exe-NoProfile-ExecutionPolicy Bypass-File .\DeployWorkstation.ps1
+   :: Method 1: Double-click the .bat launcher (recommended)
+   DeployWorkstation.bat
+
+   :: Method 2: Direct PowerShell execution
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\DeployWorkstation.ps1
    ```
- 
+
 4. **⏳ Select Deployment Mode**
-   The launcher presents four options:
+
+   The launcher presents six options:
+
    | Option | Description |
    |--------|-------------|
    | **1 - Full Deployment** | Bloatware removal + app install + system config |
-   | **2 - Bloatware Removal Only** | Skips app installation |
-   | **3 - App Installation Only** | Skips bloatware removal |
+   | **2 - Bloatware Removal Only** | Skips app installation and system config |
+   | **3 - App Installation Only** | Skips bloatware removal and system config |
    | **4 - System Config Only** | Registry/policy hardening only |
+   | **5 - Update Installed Apps** | Upgrades managed apps in-place |
+   | **6 - Exit** | |
 
 5. **✅ Review & Reboot**
   - Script pauses for final review on completion
@@ -153,11 +154,11 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 v5.2 is safe to run on already-deployed workstations. The upgrade logic updates any managed apps with newer versions available via winget.
  
 ```powershell
-# Re-run for app updates only (skip bloatware removal on a previously cleaned machine)
-.\DeployWorkstation.ps1-SkipBloatwareRemoval
- 
-# Dry-run to preview what would change without making any modifications
-.\DeployWorkstation.ps1-DryRun
+# Update managed apps only
+.\DeployWorkstation.ps1 -SkipBloatwareRemoval -SkipSystemConfig -UpdateApps
+
+# Re-run app install on a previously cleaned machine
+.\DeployWorkstation.ps1 -SkipBloatwareRemoval
 ```
  
 ## 🔧 Advanced Configuration
@@ -168,47 +169,24 @@ v5.2 is safe to run on already-deployed workstations. The upgrade logic updates 
 |-----------|-------------|
 | `-SkipAppInstall` | Skip all application installation |
 | `-SkipBloatwareRemoval` | Skip bloatware and UWP removal |
-| `-SkipDefaultUserConfig` | Skip default user profile configuration |
 | `-SkipSystemConfig` | Skip registry/policy hardening |
-| `-SkipJavaRuntimes` | Skip Java runtime installation |
-| `-UpdateApps` | Force in-place update checks for existing applications |
-| `-ExportWingetApps` | Export currently installed winget apps to `apps.json` |
-| `-ImportWingetApps` | Import and install apps from `apps.json` |
-| `-DryRun` | Simulate all actions without making changes |
+| `-UpdateApps` | Upgrade already-installed managed apps in-place |
 | `-LogPath <path>` | Custom path for the log file |
- 
-### Custom Application Lists
- 
+| `-ReportPath <path>` | Custom path for the HTML report |
+
+### Adding Applications
+
+To add or change which apps are installed, edit the `$script:ManagedApps` array near the top of `DeployWorkstation.ps1`. Each entry needs a winget ID and a display name:
+
 ```powershell
-# Core Applications (Always Installed)
-$CoreApps = @(
-    "Google.Chrome",
-    "7zip.7zip",
-    "VideoLAN.VLC",
-    "Malwarebytes.Malwarebytes"
-)
- 
-# Optional Applications (User Selectable)
-$OptionalApps = @(
-    "Microsoft.VisualStudioCode",
-    "Git.Git",
-    "Docker.DockerDesktop"
+$script:ManagedApps = @(
+    @{ Id = 'Google.Chrome';        Name = 'Google Chrome'   },
+    @{ Id = 'Notepad++.Notepad++';  Name = 'Notepad++'       },
+    # add more entries here
 )
 ```
- 
-### Offline Package Management
-```powershell
-$OfflinePackages = @{
-    "CustomApp1" = "\\NetworkShare\Software\App1.msi"
-    "CustomApp2" = "E:\Installers\App2.exe /S"
-}
-```
- 
-### Logging Configuration
-```powershell
-$LogLevel = "Detailed"   # Options: Basic, Detailed, Verbose
-$LogRetention = 30       # Days to keep logs
-```
+
+Find winget IDs with: `winget search <AppName>`
  
 ## 🎪 Configuration Profiles
  
@@ -226,9 +204,8 @@ $LogRetention = 30       # Days to keep logs
 | **Bloatware Removal** | ❌ Manual deletion | ⚠️ Basic removal | ✅ Comprehensive purge |
 | **Enterprise Software** | ❌ Manual uninstall | ❌ Often skipped | ✅ Registry-based removal |
 | **App Updates** | ❌ Manual per-app | ⚠️ Separate tool needed | ✅ In-place upgrade on re-run |
-| **Offline Support** | ✅ Media required | ❌ Internet dependent | ✅ Hybrid approach |
 | **Error Handling** | ❌ Manual intervention | ⚠️ Basic logging | ✅ Retry logic + HTML report |
-| **Customization** | ✅ Full control | ⚠️ Limited options | ✅ Highly configurable |
+| **Multi-Language** | ❌ | ❌ | ✅ en-US & es-ES auto-detected |
  
 ## 📈 Performance Metrics
  
@@ -238,7 +215,6 @@ $LogRetention = 30       # Days to keep logs
 | **Manual Steps** | 30+ operations | 1 double-click |
 | **Error Rate** | ~15% (human error) | <2% (automated) |
 | **Consistency** | Variable | 100% standardized |
-| **Scalability** | Linear time increase | Parallel deployment |
  
 ## 🎯 Use Cases
  
@@ -284,18 +260,17 @@ $LogRetention = 30       # Days to keep logs
 - Ensure all user profiles are processed
 - Check Group Policy restrictions
 
-**Offline installers not found**
-- Verify installer paths in script
-- Check file permissions on USB drive
-- Ensure installers support silent installation
+**App install fails with "package not found"**
+- Run `winget source update` to refresh the package index
+- Verify the winget ID is still current: `winget search <AppName>`
 
 ### Log Analysis
 ```powershell
 # Check for errors and warnings in the deployment log
-Get-Content .\DeployWorkstation.log | Select-String "ERROR|WARNING"
- 
+Get-Content .\DeployWorkstation.log | Select-String "ERROR|WARN"
+
 # Verify WinGet package status
-winget list--source winget
+winget list --source winget
 ```
  
 The HTML report (`DeployWorkstation.html`) provides the same information in a readable format - open it in any browser after the run completes.
@@ -305,17 +280,23 @@ The HTML report (`DeployWorkstation.html`) provides the same information in a re
 ```text
 DeployWorkstation/
 ├── DeployWorkstation.ps1      # Main PowerShell script
-├── QuickStart.cmd             # Self-elevating launcher with menu
-├── Installers/                # Offline installer directory
-│   ├── CustomApp1.msi
-│   └── CustomApp2.exe
-├── Logs/                      # Auto-created log directory
+├── DeployWorkstation.bat      # Self-elevating launcher with full menu
+├── QuickStart.cmd             # Simplified quick-launch menu
+├── Installers/                # Place offline installers here (optional)
+├── Logs/                      # Auto-created; holds log and HTML report
 │   ├── DeployWorkstation.log
 │   └── DeployWorkstation.html # Post-run HTML report
-├── Config/                    # Configuration files
-│   ├── AppLists.json
-│   └── Settings.xml
-└── README.md
+├── Config/
+│   └── Examples/
+│       ├── Corporate.json     # Example corporate profile
+│       ├── Developer.json     # Example developer profile
+│       └── HomeUser.json      # Example home user profile
+├── docs/
+│   ├── CONFIGURATION.md
+│   ├── INSTALLATION.md
+│   └── TROUBLESHOOTING.md
+└── tests/
+    └── DeployWorkstation.Tests.ps1
 ```
  
 ## 🔮 Roadmap
