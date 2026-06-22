@@ -5,7 +5,7 @@ setlocal
 :start
 echo.
 echo ==========================================
-echo   DeployWorkstation Quick Start v5.11
+echo   DeployWorkstation Quick Start v5.2
 echo   Pacific Northwest Computers
 echo ==========================================
 echo.
