@@ -1,4 +1,4 @@
-# 🚀 DeployWorkstation: 
+# 🚀 DeployWorkstation
 ## *Automated Application Setup, Bloatware Removal & Follow-up Updating Utility for Windows 10/11 Computers*
 
 <p align="center">
