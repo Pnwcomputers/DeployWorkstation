@@ -43,13 +43,13 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 - **📦 Standard App Installation & Upgrade** — automated install and in-place upgrade of essential third-party tools via WinGet
 - **💾 Offline Fallback Support** — bundles proprietary installers for network-independent deployment
 - **📋 Centralized Logging** — detailed operation logs plus an HTML report with pause-for-review functionality
-- **🔄 **App Update Support** — detects and upgrades already-installed applications in-place; safe to re-run on existing machines
-- **🛡️ **Winget Auto-Bootstrap** — automatically downloads and installs winget on OEM machines where it's missing or outdated
-- **🔁 **Network Retry Logic** — automatic retries with delay on transient network errors during installation
-- **🖥️ **Windows Edition Awareness** — detects Home vs. Pro/Enterprise and warns when policy keys will have no effect
-- **🗑️ **OEM OneDrive Removal** — three-path removal covering both Appx and embedded OEM binaries
-- **🌐 **Multi-Language Support** — auto-detects locale via `Get-Culture`; ships with `en-US` and `es-ES`
-- **✅ **Real-time Progress** — `Write-Progress` console bars throughout all major operations
+- **🔄 App Update Support** — detects and upgrades already-installed applications in-place; safe to re-run on existing machines
+- **🛡️ Winget Auto-Bootstrap** — automatically downloads and installs winget on OEM machines where it's missing or outdated
+- **🔁 Network Retry Logic** — automatic retries with delay on transient network errors during installation
+- **🖥️ Windows Edition Awareness** — detects Home vs. Pro/Enterprise and warns when policy keys will have no effect
+- **🗑️ OEM OneDrive Removal** — three-path removal covering both Appx and embedded OEM binaries
+- **🌐 Multi-Language Support** — auto-detects locale via `Get-Culture`; ships with `en-US` and `es-ES`
+- **✅ Real-time Progress** — `Write-Progress` console bars throughout all major operations
 
 ## 🛡️ Automated Removal Capabilities
  
