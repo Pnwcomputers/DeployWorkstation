@@ -15,16 +15,25 @@
  
 A PowerShell-based, automated provisioning solution that transforms Windows 10 & 11 workstation deployment from a 30-step manual process into a single "plug-and-play" operation. Whether you're imaging bare metal, cleaning up an existing PC, or running routine maintenance on already-deployed machines, DeployWorkstation handles bloatware removal, essential application installation, and in-place app upgrades.
  
-## 🆕 What's New in v5.2
- 
-- 🔄 **App Update Support** — detects and upgrades already-installed applications in-place; safe to re-run on existing machines
-- 🛡️ **Winget Auto-Bootstrap** — automatically downloads and installs winget on OEM machines where it's missing or outdated
-- 🔁 **Network Retry Logic** — automatic retries with delay on transient network errors during installation
-- 🖥️ **Windows Edition Awareness** — detects Home vs. Pro/Enterprise and warns when policy keys will have no effect
-- 🗑️ **OEM OneDrive Removal** — three-path removal covering both Appx and embedded OEM binaries
-- 🌐 **Multi-Language Support** — auto-detects locale via `Get-Culture`; ships with `en-US` and `es-ES`
-- ✅ **Real-time Progress** — `Write-Progress` console bars throughout all major operations
-- 🐛 **Stability Fixes** — improved interactive menu logic, optimized HTML report generation, and robust winget version parsing
+## 🐛 Bugs Fixed in v5.2
+
+| # | File | Issue | Fix |
+|---|------|-------|-----|
+| 1 | `QuickStart.cmd` | All 4 menu options passed `-ConfigFile` — a parameter that doesn't exist in the PS1. Every choice errored immediately. | Rewrote to use the actual `-SkipBloatwareRemoval`, `-SkipAppInstall`, `-SkipSystemConfig`, and `-UpdateApps` params. |
+| 2 | `QuickStart.cmd` | `goto start` on invalid input → no `:start` label existed → `cmd.exe` crashed the script. | Added `:start` label at the top of the menu block. |
+| 3 | `tests/DeployWorkstation.Tests.ps1:42` | Test asserted `DeployWorkstation.cmd` exists — it never did — permanent CI failure. | Changed to check `QuickStart.cmd` which actually exists. |
+| 4 | `.github/workflows/test-powershell.yml:37` | `upload-artifact@v3` was deprecated and removed by GitHub. | Upgraded to `@v4`. |
+| 5 | `DeployWorkstation.ps1:587` | `winget --version` can output multiple lines; `-replace` on an array returns an array; `[Version]` cast on an array throws and silently skips the minimum version check. | Added `Where-Object` + `Select-Object -Last 1` before the replace. |
+
+### Code Quality Updates/Fixes:
+
+| # | File | Issue | Fix |
+|---|------|-------|-----|
+| 6 | `DeployWorkstation.ps1:529` | `Set-ExecutionPolicy` was placed mid-file after all function definitions — if it threw, the machine would be left partially configured. | Moved to line 26, right after `$ProgressPreference`. |
+| 7 | `DeployWorkstation.ps1:535` | `$script:IsWin11` computed but never referenced anywhere. | Removed. |
+| 8 | `Export-HtmlReport` | Called `Get-CimInstance Win32_OperatingSystem` a second time at report generation, even though it was already cached as `$script:OsInfo`. | Replaced with `$script:OsInfo`. |
+
+---
 
 ## ✨ Key Features
  
@@ -34,6 +43,13 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 - **📦 Standard App Installation & Upgrade** — automated install and in-place upgrade of essential third-party tools via WinGet
 - **💾 Offline Fallback Support** — bundles proprietary installers for network-independent deployment
 - **📋 Centralized Logging** — detailed operation logs plus an HTML report with pause-for-review functionality
+- **🔄 **App Update Support** — detects and upgrades already-installed applications in-place; safe to re-run on existing machines
+- **🛡️ **Winget Auto-Bootstrap** — automatically downloads and installs winget on OEM machines where it's missing or outdated
+- **🔁 **Network Retry Logic** — automatic retries with delay on transient network errors during installation
+- **🖥️ **Windows Edition Awareness** — detects Home vs. Pro/Enterprise and warns when policy keys will have no effect
+- **🗑️ **OEM OneDrive Removal** — three-path removal covering both Appx and embedded OEM binaries
+- **🌐 **Multi-Language Support** — auto-detects locale via `Get-Culture`; ships with `en-US` and `es-ES`
+- **✅ **Real-time Progress** — `Write-Progress` console bars throughout all major operations
 
 ## 🛡️ Automated Removal Capabilities
  
