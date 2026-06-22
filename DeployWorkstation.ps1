@@ -46,6 +46,32 @@ if ($PSVersionTable.PSEdition -eq 'Core') {
     exit
 }
 
+# ── Startup Banner ───────────────────────────────────────────────────────────
+# Pure-ASCII art — no UTF-8 box-drawing chars. Safe on PS 5.1 regardless of
+# console codepage (some hosts decode as cp1252, producing mojibake with box-drawing).
+try { $host.UI.RawUI.WindowTitle = "DeployWorkstation v5.1" } catch {}
+Clear-Host
+Write-Host ""
+Write-Host "  ######   ##  ##   ##    ##   ######" -ForegroundColor Cyan
+Write-Host "  ##  ##   ### ##   ##    ##   ##    " -ForegroundColor Cyan
+Write-Host "  ######   ######   ## ## ##   ##    " -ForegroundColor Cyan
+Write-Host "  ##       ## ###   ########   ##    " -ForegroundColor Cyan
+Write-Host "  ##       ##  ##   ##    ##   ######" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  Pacific Northwest Computers" -ForegroundColor White
+Write-Host "  Windows Workstation Deployment Toolkit" -ForegroundColor DarkGray
+Write-Host ""
+Write-Host ("=" * 70) -ForegroundColor DarkCyan
+Write-Host "   DeployWorkstation v5.1 -- Automated Win10/11 Setup & Hardening     " -ForegroundColor Cyan
+Write-Host "   Pacific Northwest Computers  |  jon@pnwcomputers.com               " -ForegroundColor Gray
+Write-Host "   Bloatware Removal  /  App Install  /  System Configuration         " -ForegroundColor DarkGray
+Write-Host ("=" * 70) -ForegroundColor DarkCyan
+Write-Host ""
+Write-Host "  Started  : $(Get-Date -Format 'dddd MMMM dd yyyy  HH:mm:ss')" -ForegroundColor Gray
+Write-Host "  Computer : $env:COMPUTERNAME" -ForegroundColor Gray
+Write-Host "  Log      : $LogPath" -ForegroundColor Gray
+Write-Host ""
+
 # ================================
 # Localization
 # ================================
@@ -475,10 +501,9 @@ $script:ManagedApps = @(
     @{ Id = 'VideoLAN.VLC';                       Name = 'VLC Media Player'              },
 
     # ---- .NET Runtimes ----
-    @{ Id = 'Microsoft.DotNet.Framework.4.8';     Name = '.NET Framework 4.8'            },
-    @{ Id = 'Microsoft.DotNet.DesktopRuntime.6';  Name = '.NET 6 Desktop Runtime'        },
-    @{ Id = 'Microsoft.DotNet.DesktopRuntime.7';  Name = '.NET 7 Desktop Runtime'        },
-    @{ Id = 'Microsoft.DotNet.DesktopRuntime.8';  Name = '.NET 8 Desktop Runtime'        },
+    @{ Id = 'Microsoft.DotNet.Framework.4.8';      Name = '.NET Framework 4.8'            },
+    @{ Id = 'Microsoft.DotNet.DesktopRuntime.8';   Name = '.NET 8 Desktop Runtime'        },
+    @{ Id = 'Microsoft.DotNet.DesktopRuntime.10';  Name = '.NET 10 Desktop Runtime'       },
 
     # ---- Visual C++ Redistributables ----
     @{ Id = 'Microsoft.VCRedist.2015+.x64';       Name = 'VC++ 2015-2022 Redist (x64)'  },
