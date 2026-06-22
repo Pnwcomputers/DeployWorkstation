@@ -51,7 +51,7 @@ if ($PSVersionTable.PSEdition -eq 'Core') {
 # ── Startup Banner ───────────────────────────────────────────────────────────
 # Pure-ASCII art — no UTF-8 box-drawing chars. Safe on PS 5.1 regardless of
 # console codepage (some hosts decode as cp1252, producing mojibake with box-drawing).
-try { $host.UI.RawUI.WindowTitle = "DeployWorkstation v5.11" } catch {}
+try { $host.UI.RawUI.WindowTitle = "DeployWorkstation v5.2" } catch {}
 Clear-Host
 Write-Host ""
 Write-Host "  ######   ##  ##   ##    ##   ######" -ForegroundColor Cyan
@@ -64,7 +64,7 @@ Write-Host "  Pacific Northwest Computers" -ForegroundColor White
 Write-Host "  Windows Workstation Deployment Toolkit" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host ("=" * 70) -ForegroundColor DarkCyan
-Write-Host "   DeployWorkstation v5.11 -- Automated Win10/11 Setup & Hardening    " -ForegroundColor Cyan
+Write-Host "   DeployWorkstation v5.2 -- Automated Win10/11 Setup & Hardening    " -ForegroundColor Cyan
 Write-Host "   Pacific Northwest Computers  |  jon@pnwcomputers.com               " -ForegroundColor Gray
 Write-Host "   Bloatware Removal  /  App Install  /  System Configuration         " -ForegroundColor DarkGray
 Write-Host ("=" * 70) -ForegroundColor DarkCyan
@@ -85,7 +85,7 @@ $script:Strings = @{
 
     'en-US' = @{
         # Startup
-        Started           = 'DeployWorkstation v5.11 Started'
+        Started           = 'DeployWorkstation v5.2 Started'
         WingetRequired    = "Winget is required. Install 'App Installer' from the Microsoft Store."
         WingetFound       = 'Winget found'
         WingetMissing     = 'Winget not found on PATH.'
@@ -234,7 +234,7 @@ $script:Strings = @{
 
     'es-ES' = @{
         # Startup
-        Started           = 'DeployWorkstation v5.11 Iniciado'
+        Started           = 'DeployWorkstation v5.2 Iniciado'
         WingetRequired    = "Se requiere Winget. Instale 'App Installer' desde Microsoft Store."
         WingetFound       = 'Winget encontrado'
         WingetMissing     = 'Winget no encontrado en el PATH.'
