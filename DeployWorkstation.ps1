@@ -1,7 +1,8 @@
 # DeployWorkstation.ps1 – Optimized Win10/11 Setup & Clean-up
-# Version: 5.1 – PNWC Edition 4.1.2026
-# New in 5.0: Write-Progress console bars, embedded en-US / es-ES localization
-# New in 5.1: Winget auto-bootstrap, install retry logic, WU guard, OEM OneDrive, edition awareness
+# Version: 5.11 – PNWC Edition 4.1.2026
+# New in 5.0:  Write-Progress console bars, embedded en-US / es-ES localization
+# New in 5.1:  Winget auto-bootstrap, install retry logic, WU guard, OEM OneDrive, edition awareness
+# New in 5.11: App update mode (-UpdateApps), startup banner
 
 #Requires -Version 5.1
 #Requires -RunAsAdministrator
@@ -22,6 +23,7 @@ param(
 
 $ErrorActionPreference = 'Continue'
 $ProgressPreference    = 'Continue'          # Must be Continue for Write-Progress to render
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 $script:StartTime      = Get-Date
 
 # $PSScriptRoot is read-only in PS5.1 — use a separate variable for fallback safety
@@ -49,7 +51,7 @@ if ($PSVersionTable.PSEdition -eq 'Core') {
 # ── Startup Banner ───────────────────────────────────────────────────────────
 # Pure-ASCII art — no UTF-8 box-drawing chars. Safe on PS 5.1 regardless of
 # console codepage (some hosts decode as cp1252, producing mojibake with box-drawing).
-try { $host.UI.RawUI.WindowTitle = "DeployWorkstation v5.1" } catch {}
+try { $host.UI.RawUI.WindowTitle = "DeployWorkstation v5.11" } catch {}
 Clear-Host
 Write-Host ""
 Write-Host "  ######   ##  ##   ##    ##   ######" -ForegroundColor Cyan
@@ -62,7 +64,7 @@ Write-Host "  Pacific Northwest Computers" -ForegroundColor White
 Write-Host "  Windows Workstation Deployment Toolkit" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host ("=" * 70) -ForegroundColor DarkCyan
-Write-Host "   DeployWorkstation v5.1 -- Automated Win10/11 Setup & Hardening     " -ForegroundColor Cyan
+Write-Host "   DeployWorkstation v5.11 -- Automated Win10/11 Setup & Hardening    " -ForegroundColor Cyan
 Write-Host "   Pacific Northwest Computers  |  jon@pnwcomputers.com               " -ForegroundColor Gray
 Write-Host "   Bloatware Removal  /  App Install  /  System Configuration         " -ForegroundColor DarkGray
 Write-Host ("=" * 70) -ForegroundColor DarkCyan
@@ -83,7 +85,7 @@ $script:Strings = @{
 
     'en-US' = @{
         # Startup
-        Started           = 'DeployWorkstation v5.1 Started'
+        Started           = 'DeployWorkstation v5.11 Started'
         WingetRequired    = "Winget is required. Install 'App Installer' from the Microsoft Store."
         WingetFound       = 'Winget found'
         WingetMissing     = 'Winget not found on PATH.'
@@ -232,7 +234,7 @@ $script:Strings = @{
 
     'es-ES' = @{
         # Startup
-        Started           = 'DeployWorkstation v5.1 Iniciado'
+        Started           = 'DeployWorkstation v5.11 Iniciado'
         WingetRequired    = "Se requiere Winget. Instale 'App Installer' desde Microsoft Store."
         WingetFound       = 'Winget encontrado'
         WingetMissing     = 'Winget no encontrado en el PATH.'
@@ -526,13 +528,10 @@ function Add-Result {
     })
 }
 
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
-
 # Cache OS info once — used for edition-aware behavior throughout the script
 $script:OsInfo  = Get-CimInstance Win32_OperatingSystem
 $script:OsBuild = [int]$script:OsInfo.BuildNumber
 $script:IsHome  = $script:OsInfo.Caption -match '\bHome\b'
-$script:IsWin11 = $script:OsBuild -ge 22000
 
 Write-Log "===== $(T 'Started') =====" -Level 'SECTION'
 Write-Log "PowerShell  : $($PSVersionTable.PSVersion)"
@@ -584,7 +583,7 @@ function Install-WingetIfNeeded {
         Write-Log (T 'WingetMissing') -Level 'WARN'
         $needsInstall = $true
     } else {
-        $rawVer = (winget --version 2>$null) -replace '[^\d\.]', ''
+        $rawVer = ((winget --version 2>$null) | Where-Object { $_ -match '[\d\.]' } | Select-Object -Last 1) -replace '[^\d\.]', ''
         try {
             if ([Version]$rawVer -lt $minVersion) {
                 Write-Log "$(T 'WingetOld'): v$rawVer (minimum $minVersion)" -Level 'WARN'
@@ -1198,7 +1197,7 @@ function Export-HtmlReport {
 
     Set-PhaseProgress -Activity (T 'PhaseReporting') -Status (T 'ProgReportCollect') -Current 1 -Total 3
 
-    $os          = Get-CimInstance Win32_OperatingSystem
+    $os          = $script:OsInfo
     $cpu         = ConvertTo-HtmlSafe (Get-CimInstance Win32_Processor | Select-Object -First 1).Name
     $osCaption   = ConvertTo-HtmlSafe $os.Caption
     $editionRaw  = switch -Regex ($os.Caption) {
@@ -1347,7 +1346,7 @@ function Export-HtmlReport {
   <div class="info-card"><div class="label">$lRAM</div><div class="value">$ramGB GB</div></div>
   <div class="info-card"><div class="label">$lUptime</div><div class="value">$uptimeHrs $lHrs</div></div>
   <div class="info-card"><div class="label">$lRunTime</div><div class="value">$durationFmt</div></div>
-  <div class="info-card"><div class="label">$lVersion</div><div class="value">5.1</div></div>
+  <div class="info-card"><div class="label">$lVersion</div><div class="value">5.11</div></div>
   <div class="info-card"><div class="label">$lTechnician</div><div class="value">PNWC</div></div>
 </div>
 

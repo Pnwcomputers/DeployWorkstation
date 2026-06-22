@@ -1,14 +1,14 @@
 @echo off
-title DeployWorkstation Launcher v5.1
+title DeployWorkstation Launcher v5.11
 REM ========================================================
 REM  DeployWorkstation.bat  -  Launcher for DeployWorkstation.ps1
-REM  Version 5.1 - PNWC Edition 4.1.2026
+REM  Version 5.11 - PNWC Edition 4.1.2026
 REM ========================================================
 
 setlocal enabledelayedexpansion
 
 echo.
-echo ===== DeployWorkstation Launcher v5.1 =====
+echo ===== DeployWorkstation Launcher v5.11 =====
 echo.
 
 REM 1) Check if we're already elevated

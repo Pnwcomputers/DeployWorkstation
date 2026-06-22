@@ -38,8 +38,8 @@ Describe "DeployWorkstation Prerequisites" {
             Test-Path ".\DeployWorkstation.bat" | Should -Be $true
         }
 
-        It "Should have compatibility launcher script" {
-            Test-Path ".\DeployWorkstation.cmd" | Should -Be $true
+        It "Should have quick start launcher script" {
+            Test-Path ".\QuickStart.cmd" | Should -Be $true
         }
 
         It "Should have configuration directory" {

@@ -1,59 +1,68 @@
 @echo off
 title DeployWorkstation Quick Start
+setlocal
+
+:start
 echo.
 echo ==========================================
-echo   DeployWorkstation Quick Start Wizard
+echo   DeployWorkstation Quick Start v5.11
+echo   Pacific Northwest Computers
 echo ==========================================
 echo.
-echo Select your deployment profile:
+echo Select a deployment option:
 echo.
-echo 1. Standard Business (Recommended)
-echo 2. Developer Workstation
-echo 3. Home User
-echo 4. Custom Configuration
-echo 5. Exit
+echo   1. Full Deployment  (bloatware removal + app install + system config)
+echo   2. Install Apps Only
+echo   3. System Configuration Only
+echo   4. Update Installed Apps
+echo   5. Exit
 echo.
 set /p choice="Enter your choice (1-5): "
 
-if "%choice%"=="1" goto business
-if "%choice%"=="2" goto developer  
-if "%choice%"=="3" goto home
-if "%choice%"=="4" goto custom
-if "%choice%"=="5" goto exit
+if "%choice%"=="1" goto full
+if "%choice%"=="2" goto apps_only
+if "%choice%"=="3" goto config_only
+if "%choice%"=="4" goto update
+if "%choice%"=="5" goto exit_now
 goto invalid
 
-:business
-echo Starting Standard Business deployment...
-powershell.exe -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1" -ConfigFile "%~dp0Config\Examples\Corporate.json"
-goto end
-
-:developer
-echo Starting Developer Workstation deployment...
-powershell.exe -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1" -ConfigFile "%~dp0Config\Examples\Developer.json"
-goto end
-
-:home
-echo Starting Home User deployment...
-powershell.exe -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1" -ConfigFile "%~dp0Config\Examples\HomeUser.json"
-goto end
-
-:custom
+:full
 echo.
-set /p configfile="Enter path to your configuration file: "
-powershell.exe -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1" -ConfigFile "%configfile%"
+echo Starting full deployment...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1"
+goto end
+
+:apps_only
+echo.
+echo Installing applications only...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1" -SkipBloatwareRemoval -SkipSystemConfig
+goto end
+
+:config_only
+echo.
+echo Running system configuration only...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1" -SkipBloatwareRemoval -SkipAppInstall
+goto end
+
+:update
+echo.
+echo Updating installed applications...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1" -SkipBloatwareRemoval -SkipSystemConfig -UpdateApps
 goto end
 
 :invalid
-echo Invalid choice. Please try again.
+echo.
+echo Invalid choice. Please enter 1-5.
 pause
 cls
 goto start
 
-:exit
-echo Exiting...
-exit
+:exit_now
+endlocal
+exit /b 0
 
 :end
 echo.
-echo Deployment completed. Press any key to exit.
-pause
+echo Done. Press any key to close.
+pause >nul
+endlocal
