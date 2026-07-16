@@ -20,10 +20,10 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 
 | # | File | Issue | Fix |
 |---|------|-------|-----|
-| 1 | `DeployWorkstation.ps1` | `Microsoft.DotNet.Framework.4.8` was never a valid winget package ID — every run failed that install with `0x8A150014 NO_APPLICATIONS_FOUND`. | Corrected to `Microsoft.DotNet.Framework.Runtime` (currently 4.8.1), with `Microsoft.DotNet.Framework.DeveloperPack_4` as a fallback ID. On Win10 1903+ / Win11 the runtime ships in-box, so this typically resolves to a fast no-op. |
-| 2 | `DeployWorkstation.ps1` | Reboot exit codes `0x8A150109` (restart to finish) and `0x8A15010A` (restart before install) were misclassified as *network errors* — successful installs that only needed a reboot (Adobe Reader does this regularly) were retried twice, then logged as network failures. | Reboot-to-finish now counts as **success**, sets a `RebootNeeded` flag, and a restart notice is shown in the summary and at end of run. Reboot-before-install fails with the correct reason. |
+| 1 | `DeployWorkstation.ps1` | `Microsoft.DotNet.Framework.4.8` was never a valid winget package ID so every run failed that install with `0x8A150014 NO_APPLICATIONS_FOUND`. | Corrected to `Microsoft.DotNet.Framework.Runtime` (currently 4.8.1), with `Microsoft.DotNet.Framework.DeveloperPack_4` as a fallback ID. On Win10 1903+ / Win11 the runtime ships in-box, so this typically resolves to a fast no-op. |
+| 2 | `DeployWorkstation.ps1` | Reboot exit codes `0x8A150109` (restart to finish) and `0x8A15010A` (restart before install) were misclassified as *network errors*; successful installs that only needed a reboot (Adobe Reader does this regularly) were retried twice, then logged as network failures. | Reboot-to-finish now counts as **success**, sets a `RebootNeeded` flag, and a restart notice is shown in the summary and at end of run. Reboot-before-install fails with the correct reason. |
 | 3 | `DeployWorkstation.ps1` | Several exit-code hex comments were wrong (`-1978335212` labeled `0x8A15002C`, is actually `0x8A150014`; `-1978334960` labeled "blocked by policy", is actually a dependency failure). | Exit-code tables rebuilt against the official winget `returnCodes.md`; unknown codes now log their hex form for easy lookup. |
-| 4 | `DeployWorkstation.ps1` | `winget install`/`upgrade` ran without `--exact` — substring ID matching could hit the wrong package or fail as ambiguous. | Added `--exact` (plus `--disable-interactivity` to prevent hangs on prompts) to all winget install/upgrade calls. |
+| 4 | `DeployWorkstation.ps1` | `winget install`/`upgrade` ran without `--exact` so a substring ID matching could hit the wrong package or fail as ambiguous. | Added `--exact` (plus `--disable-interactivity` to prevent hangs on prompts) to all winget install/upgrade calls. |
 | 5 | `DeployWorkstation.ps1` | In update mode, apps not installed on the machine were counted as update *failures*. | `0x8A150014` from `winget upgrade --id` is now logged as **SKIPPED** (not installed), tracked separately in the summary. |
 
 ### New in v5.3: Package ID Auto-Resolution
@@ -31,10 +31,10 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 Winget package IDs get renamed and retired over time. v5.3 verifies every ID against the winget source before installing, and recovers automatically when one has changed:
 
 1. **Primary ID** checked with `winget show --exact`
-2. **Fallback IDs** — optional per-app list of known alternates, tried in order
-3. **`winget search` by display name** — adopted automatically only if the result is unambiguous; otherwise candidate IDs are logged so you can update the app list
+2. **Fallback IDs** optional per-app list of known alternates, tried in order
+3. **`winget search` by display name* adopted automatically only if the result is unambiguous; otherwise candidate IDs are logged so you can update the app list
 
-Results are cached per run (install + update share the cache), adding only a few seconds to a full deployment. Other reliability improvements: `--include-unknown` on upgrades (handles apps whose installed version winget can't read — common after Windows Update services .NET runtimes out from under winget), and installer hash-mismatch errors now trigger a `winget source update` before retrying, since they're usually a stale manifest.
+Results are cached per run (install + update share the cache), adding only a few seconds to a full deployment. Other reliability improvements: `--include-unknown` on upgrades (handles apps whose installed version winget can't read. This is common after Windows Update services .NET runtimes out from under winget), and installer hash-mismatch errors now trigger a `winget source update` before retrying, since they're usually a stale manifest.
 
 <details>
 <summary>🐛 Bugs Fixed in v5.2</summary>
@@ -292,7 +292,7 @@ Find winget IDs with: `winget search <AppName>`
 
 **App install fails with "Package ID not found in winget source"**
 - v5.3 tries fallback IDs and a `winget search` automatically before reporting this
-- Check the log for a "Possible replacement IDs" line — it lists candidates when the search was ambiguous
+- Check the log for a "Possible replacement IDs" line; it lists candidates when the search was ambiguous
 - Verify the current ID manually (`winget search <AppName>`), then update the `Id` (or add a `Fallbacks` entry) in `$script:ManagedApps`
 - Run `winget source update` to refresh the package index
 
