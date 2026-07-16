@@ -1,10 +1,17 @@
 # DeployWorkstation.ps1 – Optimized Win10/11 Setup & Clean-up
-# Version: 5.2 – PNWC Edition 6.22.2026
+# Version: 5.3 – PNWC Edition 6.22.2026
 # New in 5.0:  Write-Progress console bars, embedded en-US / es-ES localization
 # New in 5.1:  Winget auto-bootstrap, install retry logic, WU guard, OEM OneDrive, edition awareness
 # New in 5.11: App update mode (-UpdateApps), startup banner
 # New in 5.2:  Updated .NET runtimes (8 LTS + 10 LTS); bug fixes in QuickStart.cmd,
 #              winget version detection, CI workflow; code quality improvements
+# New in 5.3:  Package ID auto-resolution (Resolve-WingetPackageId with per-app
+#              fallback IDs + winget search suggestions); fixed .NET Framework ID
+#              (Microsoft.DotNet.Framework.4.8 -> Microsoft.DotNet.Framework.Runtime);
+#              corrected winget exit-code handling (reboot codes 0x8A150109/10A/10B
+#              were misclassified as network errors and retried); reboot-required
+#              installs now count as success + end-of-run restart notice;
+#              --exact and --disable-interactivity on all winget install/upgrade calls
 
 #Requires -Version 5.1
 #Requires -RunAsAdministrator
@@ -53,7 +60,7 @@ if ($PSVersionTable.PSEdition -eq 'Core') {
 # ── Startup Banner ───────────────────────────────────────────────────────────
 # Pure-ASCII art — no UTF-8 box-drawing chars. Safe on PS 5.1 regardless of
 # console codepage (some hosts decode as cp1252, producing mojibake with box-drawing).
-try { $host.UI.RawUI.WindowTitle = "DeployWorkstation v5.2" } catch {}
+try { $host.UI.RawUI.WindowTitle = "DeployWorkstation v5.3" } catch {}
 Clear-Host
 Write-Host ""
 Write-Host "  ######   ##  ##   ##    ##   ######" -ForegroundColor Cyan
@@ -66,7 +73,7 @@ Write-Host "  Pacific Northwest Computers" -ForegroundColor White
 Write-Host "  Windows Workstation Deployment Toolkit" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host ("=" * 70) -ForegroundColor DarkCyan
-Write-Host "   DeployWorkstation v5.2 -- Automated Win10/11 Setup & Hardening    " -ForegroundColor Cyan
+Write-Host "   DeployWorkstation v5.3 -- Automated Win10/11 Setup & Hardening    " -ForegroundColor Cyan
 Write-Host "   Pacific Northwest Computers  |  jon@pnwcomputers.com               " -ForegroundColor Gray
 Write-Host "   Bloatware Removal  /  App Install  /  System Configuration         " -ForegroundColor DarkGray
 Write-Host ("=" * 70) -ForegroundColor DarkCyan
@@ -87,7 +94,7 @@ $script:Strings = @{
 
     'en-US' = @{
         # Startup
-        Started           = 'DeployWorkstation v5.2 Started'
+        Started           = 'DeployWorkstation v5.3 Started'
         WingetRequired    = "Winget is required. Install 'App Installer' from the Microsoft Store."
         WingetFound       = 'Winget found'
         WingetMissing     = 'Winget not found on PATH.'
@@ -172,7 +179,13 @@ $script:Strings = @{
         WingetDownload    = 'Downloading App Installer from Microsoft'
 
         # Reliability
-        InstallRetrying   = 'Network error, retrying'
+        InstallRetrying   = 'Transient error, retrying'
+        RebootToFinish    = 'Installed - restart required to finish'
+        NotInstalledSkip  = 'Not installed on this machine, skipping'
+        IdNotFound        = 'Package ID not found in winget source'
+        IdChanged         = 'Package ID changed, using'
+        IdCandidates      = 'Possible replacement IDs for'
+        SumReboot         = '*** One or more installs require a RESTART to finish ***'
         CapWuUnavail      = 'Skipped - Windows Update not accessible on this system'
         HomeEditionNote   = 'Policy key written but has no effect on Windows Home edition'
         OneDriveOem       = 'OneDrive OEM binary removal'
@@ -236,7 +249,7 @@ $script:Strings = @{
 
     'es-ES' = @{
         # Startup
-        Started           = 'DeployWorkstation v5.2 Iniciado'
+        Started           = 'DeployWorkstation v5.3 Iniciado'
         WingetRequired    = "Se requiere Winget. Instale 'App Installer' desde Microsoft Store."
         WingetFound       = 'Winget encontrado'
         WingetMissing     = 'Winget no encontrado en el PATH.'
@@ -321,7 +334,13 @@ $script:Strings = @{
         WingetDownload    = 'Descargando App Installer de Microsoft'
 
         # Reliability
-        InstallRetrying   = 'Error de red, reintentando'
+        InstallRetrying   = 'Error transitorio, reintentando'
+        RebootToFinish    = 'Instalado - se requiere reinicio para finalizar'
+        NotInstalledSkip  = 'No instalado en este equipo, omitiendo'
+        IdNotFound        = 'ID de paquete no encontrado en la fuente winget'
+        IdChanged         = 'ID de paquete cambiado, usando'
+        IdCandidates      = 'Posibles IDs de reemplazo para'
+        SumReboot         = '*** Una o mas instalaciones requieren REINICIO para finalizar ***'
         CapWuUnavail      = 'Omitido - Windows Update no accesible en este sistema'
         HomeEditionNote   = 'Clave de politica escrita pero sin efecto en Windows Home'
         OneDriveOem       = 'Eliminacion de OneDrive OEM'
@@ -481,8 +500,10 @@ function Clear-PhaseProgress {
 $script:Summary = @{
     AppsInstalled       = 0
     AppsFailed          = 0
+    AppsSkipped         = 0
     AppsUpdated         = 0
     AppsUpdateFailed    = 0
+    RebootNeeded        = $false
     AppxRemoved         = 0
     CapabilitiesRemoved = 0
     McAfeeRemoved       = 0
@@ -493,21 +514,33 @@ $script:Summary = @{
 $script:Results = [System.Collections.Generic.List[hashtable]]::new()
 
 # Applications managed by DeployWorkstation — used by both Install-StandardApps and Update-InstalledApps
+#   Id        : primary winget package ID (verified against the winget source at run time)
+#   Name      : display name (also used as the winget search term if all IDs fail to resolve)
+#   Fallbacks : optional list of alternate IDs tried in order when the primary ID
+#               no longer exists in the winget source (IDs get renamed/retired over time)
 $script:ManagedApps = @(
     # ---- Security & Maintenance ----
     @{ Id = 'Malwarebytes.Malwarebytes';          Name = 'Malwarebytes'                  },
     @{ Id = 'BleachBit.BleachBit';                Name = 'BleachBit'                     },
 
     # ---- Browsers & Productivity ----
-    @{ Id = 'Google.Chrome';                      Name = 'Google Chrome'                 },
+    @{ Id = 'Google.Chrome';                      Name = 'Google Chrome'
+       Fallbacks = @('Google.Chrome.EXE')                                                },
     @{ Id = 'Adobe.Acrobat.Reader.64-bit';        Name = 'Adobe Acrobat Reader (64-bit)' },
     @{ Id = '7zip.7zip';                          Name = '7-Zip'                         },
     @{ Id = 'VideoLAN.VLC';                       Name = 'VLC Media Player'              },
 
     # ---- .NET Runtimes ----
-    @{ Id = 'Microsoft.DotNet.Framework.4.8';      Name = '.NET Framework 4.8'            },
-    @{ Id = 'Microsoft.DotNet.DesktopRuntime.8';   Name = '.NET 8 Desktop Runtime'        },
-    @{ Id = 'Microsoft.DotNet.DesktopRuntime.10';  Name = '.NET 10 Desktop Runtime'       },
+    # NOTE: 'Microsoft.DotNet.Framework.4.8' was never a valid winget ID (it always
+    # returns 0x8A150014 NO_APPLICATIONS_FOUND). The runtime package is
+    # 'Microsoft.DotNet.Framework.Runtime' (currently 4.8.1). .NET Fx 4.8 also ships
+    # in-box on Win10 1903+ and all Win11, so on modern builds this resolves to a no-op.
+    @{ Id = 'Microsoft.DotNet.Framework.Runtime';  Name = '.NET Framework Runtime'
+       Fallbacks = @('Microsoft.DotNet.Framework.DeveloperPack_4')                       },
+    @{ Id = 'Microsoft.DotNet.DesktopRuntime.8';   Name = '.NET 8 Desktop Runtime'
+       Fallbacks = @('Microsoft.DotNet.DesktopRuntime.8.x64')                            },
+    @{ Id = 'Microsoft.DotNet.DesktopRuntime.10';  Name = '.NET 10 Desktop Runtime'
+       Fallbacks = @('Microsoft.DotNet.DesktopRuntime.10.x64')                           },
 
     # ---- Visual C++ Redistributables ----
     @{ Id = 'Microsoft.VCRedist.2015+.x64';       Name = 'VC++ 2015-2022 Redist (x64)'  },
@@ -572,8 +605,9 @@ function Set-RegistryValue {
 # ================================
 
 function Install-WingetIfNeeded {
-    # Minimum usable winget version (supports --source winget, --accept-source-agreements)
-    $minVersion = [Version]'1.2.0'
+    # Minimum usable winget version
+    # (1.4+ required for --disable-interactivity and --include-unknown)
+    $minVersion = [Version]'1.4.0'
 
     Set-PhaseProgress -Activity (T 'ProgWingetCheck') -Status (T 'Checking') -Current 1 -Total 3
 
@@ -679,6 +713,126 @@ function Initialize-WingetSources {
     finally {
         Clear-PhaseProgress
     }
+}
+
+# ================================
+# Winget Exit Codes & Package ID Resolution
+# ================================
+
+# Codes that mean "package is effectively present" — count as success
+$script:WingetOkCodes = @(
+    -1978335189,  # 0x8A15002B UPDATE_NOT_APPLICABLE (already installed / no applicable upgrade)
+    -1978334963,  # 0x8A15010D INSTALL_ALREADY_INSTALLED (another version already installed)
+    -1978334962   # 0x8A15010E INSTALL_DOWNGRADE (a HIGHER version is already installed)
+)
+
+# Success, but Windows needs a restart to finish — count as success + flag reboot
+$script:WingetRebootOkCodes = @(
+    -1978334967,  # 0x8A150109 INSTALL_REBOOT_REQUIRED_TO_FINISH
+    -1978334965   # 0x8A15010B INSTALL_REBOOT_INITIATED
+)
+
+# Genuinely transient — worth retrying after a delay
+# (NOTE: 0x8A150109/0x8A15010A are REBOOT codes, not network codes — pre-5.3
+#  versions retried them as "network errors", masking the real condition)
+$script:WingetTransientCodes = @(
+    -1978334969,  # 0x8A150107 INSTALL_NO_NETWORK
+    -1978335215,  # 0x8A150011 INSTALLER_HASH_MISMATCH (often a stale manifest/CDN race — refresh + retry once)
+    -2147012894,  # 0x80072EE2 WinHTTP timeout
+    -2147012887,  # 0x80072EE9 connection reset by peer
+    -2147012873,  # 0x80072EF7 DNS name not resolved
+    -2147012867,  # 0x80072EFD connection refused
+    -2147012889   # 0x80072EE7 InternetOpenUrl failed / WinHTTP unknown error
+)
+
+# Package ID missing from source — triggers ID re-resolution, never a retry
+$script:WingetNotFoundCode = -1978335212   # 0x8A150014 NO_APPLICATIONS_FOUND
+
+function Get-WingetFailReason {
+    param([int]$ExitCode)
+    switch ($ExitCode) {
+        -1978335215 { 'Installer hash mismatch — manifest may be stale; check proxy/AV'  }  # 0x8A150011
+        -1978335212 { 'Package not found in winget source (ID may have changed)'          }  # 0x8A150014
+        -1978334961 { 'Installer blocked by security policy'                              }  # 0x8A15010F
+        -1978334960 { 'A dependency failed to install'                                    }  # 0x8A150110
+        -1978334959 { 'Application is in use — close it and retry'                        }  # 0x8A150111
+        -1978334966 { 'Windows must be restarted before this app can install'             }  # 0x8A15010A
+        -1978334971 { 'Disk full'                                                         }  # 0x8A150105
+        -1978334969 { 'Network failure — no connectivity (all retries exhausted)'         }  # 0x8A150107
+        -1978334955 { 'Installer returned a custom error — see winget log'                }  # 0x8A150115
+        -2147012894 { 'Network failure — timed out (all retries exhausted)'               }  # 0x80072EE2
+        -2147012887 { 'Network failure — connection reset (all retries exhausted)'        }  # 0x80072EE9
+        -2147012873 { 'Network failure — DNS not resolved (all retries exhausted)'        }  # 0x80072EF7
+        -2147012867 { 'Network failure — connection refused (all retries exhausted)'      }  # 0x80072EFD
+        -2147012889 { 'Network failure — WinHTTP error (all retries exhausted)'           }  # 0x80072EE7
+        default     { "Exit code $ExitCode (0x{0:X8})" -f ($ExitCode -band 0xFFFFFFFFL)   }
+    }
+}
+
+# Cache so install + update runs don't re-resolve the same app twice
+$script:ResolvedIds = @{}
+
+function Test-WingetIdExists {
+    param([string]$Id)
+    $null = winget show --id $Id --exact --source winget --accept-source-agreements 2>&1
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Resolve-WingetPackageId {
+    <#
+        Returns a usable winget package ID for an app entry, or $null.
+        Order: cached result -> primary Id -> each Fallback Id -> winget search by Name.
+        A search hit is auto-selected only when it is unambiguous (exactly one
+        candidate ID); otherwise candidates are logged for manual list maintenance.
+    #>
+    param([hashtable]$App)
+
+    if ($script:ResolvedIds.ContainsKey($App.Id)) { return $script:ResolvedIds[$App.Id] }
+
+    # 1) Primary ID
+    if (Test-WingetIdExists -Id $App.Id) {
+        $script:ResolvedIds[$App.Id] = $App.Id
+        return $App.Id
+    }
+    Write-Log "$(T 'IdNotFound'): $($App.Id)" -Level 'WARN'
+
+    # 2) Known fallback IDs
+    foreach ($alt in @($App.Fallbacks)) {
+        if (-not $alt) { continue }
+        if (Test-WingetIdExists -Id $alt) {
+            Write-Log "$(T 'IdChanged'): $($App.Id) -> $alt" -Level 'WARN'
+            $script:ResolvedIds[$App.Id] = $alt
+            return $alt
+        }
+    }
+
+    # 3) Last resort: search the winget source by display name and parse candidate IDs.
+    #    winget's table output is locale/width dependent, so instead of column slicing
+    #    we harvest tokens that look like package IDs (publisher.product[.suffix]).
+    try {
+        $searchOut = winget search "$($App.Name)" --source winget --accept-source-agreements 2>&1
+        $candidates = @(
+            $searchOut |
+                ForEach-Object { [regex]::Matches("$_", '(?<=\s|^)([A-Za-z0-9+][\w+.-]*\.[\w+.-]*[A-Za-z0-9+])(?=\s|$)') } |
+                ForEach-Object { $_.Groups[1].Value } |
+                Where-Object { $_ -notmatch '^\d+(\.\d+)+$' } |     # drop bare version numbers
+                Select-Object -Unique
+        )
+    } catch { $candidates = @() }
+
+    if ($candidates.Count -eq 1) {
+        # Unambiguous — verify and adopt it
+        if (Test-WingetIdExists -Id $candidates[0]) {
+            Write-Log "$(T 'IdChanged'): $($App.Id) -> $($candidates[0]) (via winget search)" -Level 'WARN'
+            $script:ResolvedIds[$App.Id] = $candidates[0]
+            return $candidates[0]
+        }
+    } elseif ($candidates.Count -gt 1) {
+        Write-Log "$(T 'IdCandidates') '$($App.Name)': $($candidates -join ', ')" -Level 'WARN'
+    }
+
+    $script:ResolvedIds[$App.Id] = $null
+    return $null
 }
 
 # ================================
@@ -927,18 +1081,6 @@ function Remove-McAfeeProducts {
 function Install-StandardApps {
     Write-Log "--- $(T 'ProgApps') ---" -Level 'SECTION'
 
-    $alreadyInstalledCode = -1978335189   # winget 0x8A15002B
-
-    # Winget exit codes that indicate a transient network problem — worth retrying
-    $networkErrorCodes = @(
-        -1978334967,  # 0x8A150109  winget download failed
-        -1978334966,  # 0x8A15010A  winget network timeout
-        -2147012887,  # 0x80072EE9  connection reset by peer
-        -2147012873,  # 0x80072EF7  DNS name not resolved
-        -2147012867,  # 0x80072EFD  connection refused
-        -2147012889   # 0x80072EE7  InternetOpenUrl failed / WinHTTP unknown error
-    )
-
     $maxRetries    = 2
     $retryDelaySec = 10
 
@@ -955,6 +1097,15 @@ function Install-StandardApps {
 
         Write-Log "$(T 'Installing'): $($app.Name)  [$($app.Id)]"
         try {
+            # Verify the package ID still exists; fall back / search if it changed
+            $resolvedId = Resolve-WingetPackageId -App $app
+            if (-not $resolvedId) {
+                Write-Log "$(T 'InstallFail'): $($app.Name) - $(T 'IdNotFound')" -Level 'WARN'
+                Add-Result -Section (T 'PhaseApps') -Item $app.Name -Status 'WARN' -Detail (T 'IdNotFound')
+                $script:Summary.AppsFailed++
+                continue
+            }
+
             $attempt   = 0
             $exitCode  = -1
             $wingetOut = $null
@@ -962,15 +1113,19 @@ function Install-StandardApps {
             do {
                 $attempt++
                 # Capture output rather than discarding it — logged on failure
-                $wingetOut = winget install --id $app.Id --source winget `
+                $wingetOut = winget install --id $resolvedId --exact --source winget `
                     --accept-package-agreements --accept-source-agreements `
-                    --silent 2>&1
+                    --silent --disable-interactivity 2>&1
                 $exitCode = $LASTEXITCODE
 
-                if ($exitCode -eq 0 -or $exitCode -eq $alreadyInstalledCode) { break }
+                if ($exitCode -eq 0 -or
+                    $exitCode -in $script:WingetOkCodes -or
+                    $exitCode -in $script:WingetRebootOkCodes) { break }
 
-                if ($attempt -le $maxRetries -and $exitCode -in $networkErrorCodes) {
+                if ($attempt -le $maxRetries -and $exitCode -in $script:WingetTransientCodes) {
                     Write-Log "$(T 'InstallRetrying') ($attempt/$maxRetries): $($app.Name) [exit $exitCode]" -Level 'WARN'
+                    # Hash mismatches are often a stale local manifest cache — refresh before retrying
+                    if ($exitCode -eq -1978335215) { winget source update --name winget 2>$null | Out-Null }
                     Start-Sleep -Seconds $retryDelaySec
                 } else {
                     break
@@ -981,27 +1136,19 @@ function Install-StandardApps {
                 Write-Log "$(T 'InstallOK'): $($app.Name)" -Level 'SUCCESS'
                 Add-Result -Section (T 'PhaseApps') -Item $app.Name -Status 'OK' -Detail (T 'InstallOK')
                 $script:Summary.AppsInstalled++
-            } elseif ($exitCode -eq $alreadyInstalledCode) {
+            } elseif ($exitCode -in $script:WingetRebootOkCodes) {
+                # Install succeeded but Windows needs a restart to finish — NOT a failure
+                Write-Log "$(T 'InstallOK'): $($app.Name) - $(T 'RebootToFinish')" -Level 'SUCCESS'
+                Add-Result -Section (T 'PhaseApps') -Item $app.Name -Status 'OK' -Detail (T 'RebootToFinish')
+                $script:Summary.AppsInstalled++
+                $script:Summary.RebootNeeded = $true
+            } elseif ($exitCode -in $script:WingetOkCodes) {
                 Write-Log "$(T 'AlreadyInstalled'): $($app.Name)" -Level 'SUCCESS'
                 Add-Result -Section (T 'PhaseApps') -Item $app.Name -Status 'OK' -Detail (T 'AlreadyInstalled')
                 $script:Summary.AppsInstalled++
             } else {
-                # Map exit code to a human-readable reason.
-                # Using switch($int) avoids hashtable string/int key-type ambiguity.
-                # Network codes here cover the "all retries exhausted" path.
-                $failReason = switch ($exitCode) {
-                    -1978335215 { 'Installer hash mismatch — retry later or check proxy/AV'     }  # 0x8A150011
-                    -1978335212 { 'Package not found in winget source (ID may have changed)'     }  # 0x8A15002C
-                    -1978334960 { 'Installer blocked by security policy'                          }  # 0x8A150110
-                    -1978335132 { 'Installer requires reboot before continuing'                   }  # 0x8A150064
-                    -1978334967 { 'Network failure — download failed (all retries exhausted)'    }  # 0x8A150109
-                    -1978334966 { 'Network failure — timed out (all retries exhausted)'          }  # 0x8A15010A
-                    -2147012887 { 'Network failure — connection reset (all retries exhausted)'   }  # 0x80072EE9
-                    -2147012873 { 'Network failure — DNS not resolved (all retries exhausted)'   }  # 0x80072EF7
-                    -2147012867 { 'Network failure — connection refused (all retries exhausted)' }  # 0x80072EFD
-                    -2147012889 { 'Network failure — WinHTTP error (all retries exhausted)'      }  # 0x80072EE7
-                    default     { "Exit code $exitCode" }
-                }
+                $failReason = Get-WingetFailReason -ExitCode $exitCode
+                if ($exitCode -eq -1978334966) { $script:Summary.RebootNeeded = $true }  # reboot-before-install
                 Write-Log "$(T 'InstallFail'): $($app.Name) - $failReason" -Level 'WARN'
                 # Log last clean lines of winget output — strip progress-bar/spinner noise
                 $diagLines = ($wingetOut | Where-Object { "$_".Trim() }) | Select-Object -Last 8
@@ -1032,16 +1179,9 @@ function Install-StandardApps {
 # ================================
 
 function Update-InstalledApps {
-    $alreadyUpToDateCode = -1978335189  # 0x8A15002B  No applicable upgrade found
-
-    $networkErrorCodes = @(
-        -1978334967,  # 0x8A150109  download failed
-        -1978334966,  # 0x8A15010A  winget network timeout
-        -2147012887,  # 0x80072EE9  connection reset by peer
-        -2147012873,  # 0x80072EF7  DNS name not resolved
-        -2147012867,  # 0x80072EFD  connection refused
-        -2147012889   # 0x80072EE7  InternetOpenUrl failed / WinHTTP unknown error
-    )
+    # 0x8A150014 NO_APPLICATIONS_FOUND from `winget upgrade --id` means the app
+    # isn't installed on this machine — a skip, not an error, in update mode
+    $notInstalledCode = $script:WingetNotFoundCode
 
     $maxRetries    = 2
     $retryDelaySec = 10
@@ -1058,21 +1198,35 @@ function Update-InstalledApps {
 
         Write-Log "$(T 'Updating'): $($app.Name)  [$($app.Id)]"
         try {
+            $resolvedId = Resolve-WingetPackageId -App $app
+            if (-not $resolvedId) {
+                Write-Log "$(T 'UpdateFail'): $($app.Name) - $(T 'IdNotFound')" -Level 'WARN'
+                Add-Result -Section (T 'PhaseUpdate') -Item $app.Name -Status 'WARN' -Detail (T 'IdNotFound')
+                $script:Summary.AppsUpdateFailed++
+                continue
+            }
+
             $attempt   = 0
             $exitCode  = -1
             $wingetOut = $null
 
             do {
                 $attempt++
-                $wingetOut = winget upgrade --id $app.Id --source winget `
+                # --include-unknown: upgrade apps whose installed version winget can't read
+                # (common after Windows Update services .NET runtimes out from under winget)
+                $wingetOut = winget upgrade --id $resolvedId --exact --source winget `
                     --accept-package-agreements --accept-source-agreements `
-                    --silent 2>&1
+                    --include-unknown --silent --disable-interactivity 2>&1
                 $exitCode = $LASTEXITCODE
 
-                if ($exitCode -eq 0 -or $exitCode -eq $alreadyUpToDateCode) { break }
+                if ($exitCode -eq 0 -or
+                    $exitCode -eq $notInstalledCode -or
+                    $exitCode -in $script:WingetOkCodes -or
+                    $exitCode -in $script:WingetRebootOkCodes) { break }
 
-                if ($attempt -le $maxRetries -and $exitCode -in $networkErrorCodes) {
+                if ($attempt -le $maxRetries -and $exitCode -in $script:WingetTransientCodes) {
                     Write-Log "$(T 'InstallRetrying') ($attempt/$maxRetries): $($app.Name) [exit $exitCode]" -Level 'WARN'
+                    if ($exitCode -eq -1978335215) { winget source update --name winget 2>$null | Out-Null }
                     Start-Sleep -Seconds $retryDelaySec
                 } else {
                     break
@@ -1083,24 +1237,22 @@ function Update-InstalledApps {
                 Write-Log "$(T 'UpdateOK'): $($app.Name)" -Level 'SUCCESS'
                 Add-Result -Section (T 'PhaseUpdate') -Item $app.Name -Status 'OK' -Detail (T 'UpdateOK')
                 $script:Summary.AppsUpdated++
-            } elseif ($exitCode -eq $alreadyUpToDateCode) {
+            } elseif ($exitCode -in $script:WingetRebootOkCodes) {
+                Write-Log "$(T 'UpdateOK'): $($app.Name) - $(T 'RebootToFinish')" -Level 'SUCCESS'
+                Add-Result -Section (T 'PhaseUpdate') -Item $app.Name -Status 'OK' -Detail (T 'RebootToFinish')
+                $script:Summary.AppsUpdated++
+                $script:Summary.RebootNeeded = $true
+            } elseif ($exitCode -eq $notInstalledCode) {
+                Write-Log "$(T 'NotInstalledSkip'): $($app.Name)" -Level 'INFO'
+                Add-Result -Section (T 'PhaseUpdate') -Item $app.Name -Status 'SKIPPED' -Detail (T 'NotInstalledSkip')
+                $script:Summary.AppsSkipped++
+            } elseif ($exitCode -in $script:WingetOkCodes) {
                 Write-Log "$(T 'AlreadyUpToDate'): $($app.Name)" -Level 'SUCCESS'
                 Add-Result -Section (T 'PhaseUpdate') -Item $app.Name -Status 'OK' -Detail (T 'AlreadyUpToDate')
                 $script:Summary.AppsUpdated++
             } else {
-                $failReason = switch ($exitCode) {
-                    -1978335215 { 'Installer hash mismatch — retry later or check proxy/AV'     }
-                    -1978335212 { 'Package not found in winget source (ID may have changed)'     }
-                    -1978334960 { 'Installer blocked by security policy'                          }
-                    -1978335132 { 'Installer requires reboot before continuing'                   }
-                    -1978334967 { 'Network failure — download failed (all retries exhausted)'    }
-                    -1978334966 { 'Network failure — timed out (all retries exhausted)'          }
-                    -2147012887 { 'Network failure — connection reset (all retries exhausted)'   }
-                    -2147012873 { 'Network failure — DNS not resolved (all retries exhausted)'   }
-                    -2147012867 { 'Network failure — connection refused (all retries exhausted)' }
-                    -2147012889 { 'Network failure — WinHTTP error (all retries exhausted)'      }
-                    default     { "Exit code $exitCode" }
-                }
+                $failReason = Get-WingetFailReason -ExitCode $exitCode
+                if ($exitCode -eq -1978334966) { $script:Summary.RebootNeeded = $true }
                 Write-Log "$(T 'UpdateFail'): $($app.Name) - $failReason" -Level 'WARN'
                 $diagLines = ($wingetOut | Where-Object { "$_".Trim() }) | Select-Object -Last 8
                 foreach ($line in $diagLines) {
@@ -1424,6 +1576,9 @@ function Write-ConsoleSummary {
     Write-Log "$( (T 'SumConfigOK')  ) : $($script:Summary.HardeningApplied)"
     Write-Log "$( (T 'SumConfigFail')) : $($script:Summary.HardeningFailed)"
     Write-Log "$( (T 'SumMcAfee')    ) : $($script:Summary.McAfeeRemoved)"
+    if ($script:Summary.RebootNeeded) {
+        Write-Log (T 'SumReboot') -Level 'WARN'
+    }
     Write-Log $border -Level 'SECTION'
 }
 
@@ -1508,6 +1663,9 @@ try {
     Write-Host "`n*** $(T 'SetupComplete') ***" -ForegroundColor Green
     Write-Host "    Log    : $LogPath"          -ForegroundColor Gray
     Write-Host "    Report : $ReportPath"       -ForegroundColor Cyan
+    if ($script:Summary.RebootNeeded) {
+        Write-Host "`n$(T 'SumReboot')"         -ForegroundColor Yellow
+    }
     Write-Host "`n$(T 'PressEnter')"            -ForegroundColor Yellow
     Read-Host | Out-Null
 }
