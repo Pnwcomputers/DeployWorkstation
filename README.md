@@ -13,47 +13,51 @@
 ![Maintenance](https://img.shields.io/badge/Maintained-Yes-green)
 
 ### **Zero-Touch Windows Workstation Provisioning & Maintenance Toolkit**
- 
+
 A PowerShell-based, automated provisioning solution that transforms Windows 10 & 11 workstation deployment from a 30-step manual process into a single "plug-and-play" operation. Whether you're imaging bare metal, cleaning up an existing PC, or running routine maintenance on already-deployed machines, DeployWorkstation handles bloatware removal, essential application installation, and in-place app upgrades.
 
-# Version v5.3 
+---
+
+# 📌 Version 5.3
 
 ## 🐛 Bugs Fixed in v5.3
 
 | # | File | Issue | Fix |
 |---|------|-------|-----|
-| 1 | `DeployWorkstation.ps1` | `Microsoft.DotNet.Framework.4.8` was never a valid winget package ID so every run failed that install with `0x8A150014 NO_APPLICATIONS_FOUND`. | Corrected to `Microsoft.DotNet.Framework.Runtime` (currently 4.8.1), with `Microsoft.DotNet.Framework.DeveloperPack_4` as a fallback ID. On Win10 1903+ / Win11 the runtime ships in-box, so this typically resolves to a fast no-op. |
+| 1 | `DeployWorkstation.ps1` | `Microsoft.DotNet.Framework.4.8` was never a valid winget package ID, so every run failed that install with `0x8A150014 NO_APPLICATIONS_FOUND`. | Corrected to `Microsoft.DotNet.Framework.Runtime` (currently 4.8.1), with `Microsoft.DotNet.Framework.DeveloperPack_4` as a fallback ID. On Win10 1903+ / Win11 the runtime ships in-box, so this typically resolves to a fast no-op. |
 | 2 | `DeployWorkstation.ps1` | Reboot exit codes `0x8A150109` (restart to finish) and `0x8A15010A` (restart before install) were misclassified as *network errors*; successful installs that only needed a reboot (Adobe Reader does this regularly) were retried twice, then logged as network failures. | Reboot-to-finish now counts as **success**, sets a `RebootNeeded` flag, and a restart notice is shown in the summary and at end of run. Reboot-before-install fails with the correct reason. |
-| 3 | `DeployWorkstation.ps1` | Several exit-code hex comments were wrong (`-1978335212` labeled `0x8A15002C`, is actually `0x8A150014`; `-1978334960` labeled "blocked by policy", is actually a dependency failure). | Exit-code tables rebuilt against the official winget `returnCodes.md`; unknown codes now log their hex form for easy lookup. |
-| 4 | `DeployWorkstation.ps1` | `winget install`/`upgrade` ran without `--exact` so a substring ID matching could hit the wrong package or fail as ambiguous. | Added `--exact` (plus `--disable-interactivity` to prevent hangs on prompts) to all winget install/upgrade calls. |
-| 5 | `DeployWorkstation.ps1` | In update mode, apps not installed on the machine were counted as update *failures*. | `0x8A150014` from `winget upgrade --id` is now logged as **SKIPPED** (not installed), tracked separately in the summary. |
+| 3 | `DeployWorkstation.ps1` | Several exit-code hex comments were wrong (`-1978335212` labeled `0x8A15002C` is actually `0x8A150014`; `-1978334960` labeled "blocked by policy" is actually a dependency failure). | Exit-code tables rebuilt against the official winget `returnCodes.md`; unknown codes now log their hex form for easy lookup. |
+| 4 | `DeployWorkstation.ps1` | `winget install`/`upgrade` ran without `--exact`, so a substring ID match could hit the wrong package or fail as ambiguous. | Added `--exact` (plus `--disable-interactivity` to prevent hangs on prompts) to all winget install/upgrade calls. |
+| 5 | `DeployWorkstation.ps1` | In update mode, apps not installed on the machine were counted as update *failures*. | `0x8A150014` from `winget upgrade --id` is now logged as **SKIPPED** (not installed) and tracked separately in the summary. |
 
-### New in v5.3: Package ID Auto-Resolution
+### 🆕 New in v5.3: Package ID Auto-Resolution
 
 Winget package IDs get renamed and retired over time. v5.3 verifies every ID against the winget source before installing, and recovers automatically when one has changed:
 
-1. **Primary ID** checked with `winget show --exact`
-2. **Fallback IDs** optional per-app list of known alternates, tried in order
-3. **`winget search` by display name* adopted automatically only if the result is unambiguous; otherwise candidate IDs are logged so you can update the app list
+1. **Primary ID** — checked with `winget show --exact`
+2. **Fallback IDs** — an optional per-app list of known alternates, tried in order
+3. **`winget search` by display name** — adopted automatically only if the result is unambiguous; otherwise candidate IDs are logged so you can update the app list
 
-Results are cached per run (install + update share the cache), adding only a few seconds to a full deployment. Other reliability improvements: `--include-unknown` on upgrades (handles apps whose installed version winget can't read. This is common after Windows Update services .NET runtimes out from under winget), and installer hash-mismatch errors now trigger a `winget source update` before retrying, since they're usually a stale manifest.
+Results are cached per run (install + update share the cache), adding only a few seconds to a full deployment.
+
+Other reliability improvements: `--include-unknown` on upgrades (handles apps whose installed version winget can't read — common after Windows Update services .NET runtimes out from under winget), and installer hash-mismatch errors now trigger a `winget source update` before retrying, since they're usually caused by a stale manifest.
 
 <details>
 <summary>🐛 Bugs Fixed in v5.2</summary>
 
 | # | File | Issue | Fix |
 |---|------|-------|-----|
-| 1 | `QuickStart.cmd` | All 4 menu options passed `-ConfigFile` - a parameter that doesn't exist in the PS1. Every choice errored immediately. | Rewrote to use the actual `-SkipBloatwareRemoval`, `-SkipAppInstall`, `-SkipSystemConfig`, and `-UpdateApps` params. |
+| 1 | `QuickStart.cmd` | All 4 menu options passed `-ConfigFile` — a parameter that doesn't exist in the PS1. Every choice errored immediately. | Rewrote to use the actual `-SkipBloatwareRemoval`, `-SkipAppInstall`, `-SkipSystemConfig`, and `-UpdateApps` params. |
 | 2 | `QuickStart.cmd` | `goto start` on invalid input → no `:start` label existed → `cmd.exe` crashed the script. | Added `:start` label at the top of the menu block. |
-| 3 | `tests/DeployWorkstation.Tests.ps1:42` | Test asserted `DeployWorkstation.cmd` exists - it never did - permanent CI failure. | Changed to check `QuickStart.cmd` which actually exists. |
+| 3 | `tests/DeployWorkstation.Tests.ps1:42` | Test asserted `DeployWorkstation.cmd` exists — it never did — permanent CI failure. | Changed to check `QuickStart.cmd` which actually exists. |
 | 4 | `.github/workflows/test-powershell.yml:37` | `upload-artifact@v3` was deprecated and removed by GitHub. | Upgraded to `@v4`. |
 | 5 | `DeployWorkstation.ps1:587` | `winget --version` can output multiple lines; `-replace` on an array returns an array; `[Version]` cast on an array throws and silently skips the minimum version check. | Added `Where-Object` + `Select-Object -Last 1` before the replace. |
 
-### Code Quality Updates/Fixes:
+#### Code Quality Updates/Fixes:
 
 | # | File | Issue | Fix |
 |---|------|-------|-----|
-| 6 | `DeployWorkstation.ps1:529` | `Set-ExecutionPolicy` was placed mid-file after all function definitions - if it threw, the machine would be left partially configured. | Moved to line 26, right after `$ProgressPreference`. |
+| 6 | `DeployWorkstation.ps1:529` | `Set-ExecutionPolicy` was placed mid-file after all function definitions — if it threw, the machine would be left partially configured. | Moved to line 26, right after `$ProgressPreference`. |
 | 7 | `DeployWorkstation.ps1:535` | `$script:IsWin11` computed but never referenced anywhere. | Removed. |
 | 8 | `Export-HtmlReport` | Called `Get-CimInstance Win32_OperatingSystem` a second time at report generation, even though it was already cached as `$script:OsInfo`. | Replaced with `$script:OsInfo`. |
 
@@ -63,24 +67,25 @@ Results are cached per run (install + update share the cache), adding only a few
 
 ## ✨ Key Features
 
-- **🔐 Self-Elevating & Policy-Bypassing** - Automatically relaunches under Windows PowerShell 5.1 with `-ExecutionPolicy Bypass` and UAC elevation
-- **🗑️ UWP "Bloatware" Purge** - Comprehensive removal of built-in apps including Copilot, Teams, New Outlook, Clipchamp, OneDrive, Xbox, and more
-- **⚙️ Win32/MSI Removal & DISM Cleanup** - Enterprise software removal via WinGet, DISM, and registry manipulation
-- **📦 Standard App Installation & Upgrade** - Automated install and in-place upgrade of essential third-party tools via WinGet
-- **🔎 Package ID Auto-Resolution** *(new in 5.3)* - Verifies every winget ID before install; recovers from renamed/retired IDs via per-app fallbacks and `winget search`, and logs replacement candidates
-- **🔄 Reboot-Aware Exit Handling** *(new in 5.3)* - Installs that succeed but require a restart are counted as success, flagged in the summary, and surfaced with a restart notice at end of run
-- **📋 Centralized Logging** - Detailed operation logs plus a dark-themed HTML report with system info summary and full event log
-- **🔄 App Update Support** - Detects and upgrades already-installed applications in-place; safe to re-run on existing machines
-- **🛡️ Winget Auto-Bootstrap** - Automatically downloads and installs winget on OEM machines where it's missing or outdated (v5.3 requires winget 1.4+ and bootstraps it automatically)
-- **🔁 Smart Retry Logic** - Automatic retries with delay on genuinely transient errors (network faults, stale-manifest hash mismatches); reboot and policy errors are correctly identified instead of blindly retried
-- **🖥️ Windows Edition Awareness** - Detects Home vs. Pro/Enterprise and warns when policy keys will have no effect
-- **🗑️ OEM OneDrive Removal** - Three-path removal covering both Appx and embedded OEM binaries
-- **🌐 Multi-Language Support** - Auto-detects locale via `Get-Culture`; ships with `en-US` and `es-ES`
-- **✅ Real-time Progress** - `Write-Progress` console bars throughout all major operations
+- **🔐 Self-Elevating & Policy-Bypassing** — Automatically relaunches under Windows PowerShell 5.1 with `-ExecutionPolicy Bypass` and UAC elevation
+- **🗑️ UWP "Bloatware" Purge** — Comprehensive removal of built-in apps including Copilot, Teams, New Outlook, Clipchamp, OneDrive, Xbox, and more
+- **⚙️ Win32/MSI Removal & DISM Cleanup** — Enterprise software removal via WinGet, DISM, and registry manipulation
+- **📦 Standard App Installation & Upgrade** — Automated install and in-place upgrade of essential third-party tools via WinGet
+- **🔎 Package ID Auto-Resolution** *(new in 5.3)* — Verifies every winget ID before install; recovers from renamed/retired IDs via per-app fallbacks and `winget search`, and logs replacement candidates
+- **🔄 Reboot-Aware Exit Handling** *(new in 5.3)* — Installs that succeed but require a restart are counted as success, flagged in the summary, and surfaced with a restart notice at end of run
+- **📋 Centralized Logging** — Detailed operation logs plus a dark-themed HTML report with system info summary and full event log
+- **🔄 App Update Support** — Detects and upgrades already-installed applications in-place; safe to re-run on existing machines
+- **🛡️ Winget Auto-Bootstrap** — Automatically downloads and installs winget on OEM machines where it's missing or outdated (v5.3 requires winget 1.4+ and bootstraps it automatically)
+- **🔁 Smart Retry Logic** — Automatic retries with delay on genuinely transient errors (network faults, stale-manifest hash mismatches); reboot and policy errors are correctly identified instead of blindly retried
+- **🖥️ Windows Edition Awareness** — Detects Home vs. Pro/Enterprise and warns when policy keys will have no effect
+- **🗑️ OEM OneDrive Removal** — Three-path removal covering both Appx and embedded OEM binaries
+- **🌐 Multi-Language Support** — Auto-detects locale via `Get-Culture`; ships with `en-US` and `es-ES`
+- **✅ Real-time Progress** — `Write-Progress` console bars throughout all major operations
 
 ## 🛡️ Automated Removal Capabilities
 
 ### UWP Applications Removed
+
 - 📧 New Outlook (Microsoft.OutlookForWindows)
 - 🤖 Copilot Assistant
 - 👥 Microsoft Teams (Consumer)
@@ -95,14 +100,17 @@ Results are cached per run (install + update share the cache), adding only a few
 - 🆘 Quick Assist
 
 ### Windows Capabilities Removed
+
 - 🆘 Quick Assist capability
 - 🎮 Xbox TCUI, Game Overlay & Speech-to-Text overlays
 - 🔑 OpenSSH Client
 
 ### Enterprise Software Removal
+
 - 🛡️ McAfee Security Suite (registry-based uninstall)
 
 ### Privacy & Telemetry Hardening
+
 - Disables Windows telemetry collection
 - Disables Windows Error Reporting
 - Disables CEIP (Customer Experience Improvement Program)
@@ -111,26 +119,30 @@ Results are cached per run (install + update share the cache), adding only a few
 ## 📥 Essential Applications Installed
 
 ### Security & Maintenance
-- 🦠 **Malwarebytes** - Malware protection
-- 🧹 **BleachBit** - System cleanup and privacy tool
+
+- 🦠 **Malwarebytes** — Malware protection
+- 🧹 **BleachBit** — System cleanup and privacy tool
 
 ### Productivity Suite
-- 🌐 **Google Chrome** - Web browser
-- 🗜️ **7-Zip** - Universal archive manager
-- 📄 **Adobe Acrobat Reader DC** (64-bit) - PDF viewer
-- 📹 **VLC Media Player** - Universal media player
+
+- 🌐 **Google Chrome** — Web browser
+- 🗜️ **7-Zip** — Universal archive manager
+- 📄 **Adobe Acrobat Reader DC** (64-bit) — PDF viewer
+- 📹 **VLC Media Player** — Universal media player
 
 ### Development Runtimes
-- ⚙️ **.NET Framework Runtime** (4.8.1) - Legacy app compatibility; ships in-box on Win10 1903+/Win11, so this is usually a no-op
-- ⚙️ **.NET 8 Desktop Runtime** - LTS, supported through November 2026
-- ⚙️ **.NET 10 Desktop Runtime** - LTS, supported through November 2030
+
+- ⚙️ **.NET Framework Runtime** (4.8.1) — Legacy app compatibility; ships in-box on Win10 1903+/Win11, so this is usually a no-op
+- ⚙️ **.NET 8 Desktop Runtime** — LTS, supported through November 2026
+- ⚙️ **.NET 10 Desktop Runtime** — LTS, supported through November 2030
 - 🔧 **Visual C++ 2015–2022 Redistributables** (x64 & x86)
 
 ## 🚀 Installation & Usage
 
 ### Prerequisites
+
 - 💻 Windows 10/11 (Most Editions)
-- 🌐 Internet Connection (for WinGet packages - Winget 1.4+ auto-installs if missing or outdated)
+- 🌐 Internet Connection (for WinGet packages — Winget 1.4+ auto-installs if missing or outdated)
 - 👤 Administrator Access
 - 💾 USB Drive or Network Share (Optional)
 
@@ -171,11 +183,11 @@ Results are cached per run (install + update share the cache), adding only a few
    | **6 - Exit** | |
 
 5. **✅ Review & Reboot**
-  - Script pauses for final review on completion
-  - HTML report generated: `DeployWorkstation.html`
-  - Detailed log available: `DeployWorkstation.log`
-  - If any install requires a restart to finish, the summary and end-of-run output say so explicitly
-  - System reboot recommended for a clean finish
+   - Script pauses for final review on completion
+   - HTML report generated: `DeployWorkstation.html`
+   - Detailed log available: `DeployWorkstation.log`
+   - If any install requires a restart to finish, the summary and end-of-run output say so explicitly
+   - System reboot recommended for a clean finish
 
 ### Re-Running on Existing Machines
 
@@ -251,24 +263,28 @@ Find winget IDs with: `winget search <AppName>`
 ## 🎯 Use Cases
 
 ### **🏢 Enterprise Deployment**
+
 - New employee workstation setup
 - Hardware refresh projects
 - Standardized corporate imaging
 - Remote office provisioning
 
 ### **🔧 IT Service Providers**
+
 - Client workstation deployment and routine maintenance
 - Malware cleanup and rebuild
 - Hardware upgrade services
-- Maintenance contract fulfillment - re-run to keep apps current
+- Maintenance contract fulfillment — re-run to keep apps current
 
 ### **🏫 Educational Institutions**
+
 - Lab computer preparation
 - Student workstation imaging
 - Faculty equipment setup
 - Semester refresh operations
 
 ### **🏠 Home & Small Business**
+
 - Personal computer setup
 - Family PC maintenance
 - Small office standardization
@@ -278,31 +294,37 @@ Find winget IDs with: `winget search <AppName>`
 ### Common Issues
 
 **Script won't execute**
+
 - Ensure PowerShell execution policy allows scripts
 - Verify UAC elevation is working
 - Check Windows PowerShell 5.1 is available
 
 **WinGet installation failures**
+
 - The script will attempt to auto-install/repair winget on OEM machines (v5.3 requires winget 1.4+ and bootstraps the current release automatically)
 - Verify internet connectivity if bootstrap also fails
 - Update Windows to latest version
 
 **Bloatware returns after reboot**
+
 - Run script as Administrator
 - Ensure all user profiles are processed
 - Check Group Policy restrictions
 
 **App install fails with "Package ID not found in winget source"**
+
 - v5.3 tries fallback IDs and a `winget search` automatically before reporting this
 - Check the log for a "Possible replacement IDs" line; it lists candidates when the search was ambiguous
 - Verify the current ID manually (`winget search <AppName>`), then update the `Id` (or add a `Fallbacks` entry) in `$script:ManagedApps`
 - Run `winget source update` to refresh the package index
 
 **Install marked OK but says "restart required to finish"**
-- This is success, not an error - some installers (Adobe Reader in particular) finish on the next boot
+
+- This is success, not an error — some installers (Adobe Reader in particular) finish on the next boot
 - Reboot the machine; re-running the script afterward will confirm the app as already installed
 
 ### Log Analysis
+
 ```powershell
 # Check for errors and warnings in the deployment log
 Get-Content .\DeployWorkstation.log | Select-String "ERROR|WARN"
@@ -311,7 +333,7 @@ Get-Content .\DeployWorkstation.log | Select-String "ERROR|WARN"
 winget list --source winget
 ```
 
-The HTML report (`DeployWorkstation.html`) provides the same information in a readable format - open it in any browser after the run completes.
+The HTML report (`DeployWorkstation.html`) provides the same information in a readable format — open it in any browser after the run completes.
 
 ## 🛠️ Project Structure
 
@@ -352,14 +374,14 @@ DeployWorkstation/
 
 We welcome contributions! Here's how to get started:
 
-- **📖 Documentation** - Improve README clarity, add configuration examples, create troubleshooting guides
-- **🐛 Bug Reports** - Open issues with detailed descriptions, system info, and log excerpts
-- **💡 Feature Requests** - Open issues with `[FEATURE]` tag, describe use case and benefits
-- **🔒 Security Issues** - Email [support@pnwcomputers.com](mailto:support@pnwcomputers.com) with proof of concept; allow reasonable disclosure time
+- **📖 Documentation** — Improve README clarity, add configuration examples, create troubleshooting guides
+- **🐛 Bug Reports** — Open issues with detailed descriptions, system info, and log excerpts
+- **💡 Feature Requests** — Open issues with `[FEATURE]` tag, describe use case and benefits
+- **🔒 Security Issues** — Email [support@pnwcomputers.com](mailto:support@pnwcomputers.com) with proof of concept; allow reasonable disclosure time
 
 ## 📄 License
 
-This project is licensed under the MIT License - See the [LICENSE](LICENSE.md) file for details.
+This project is licensed under the MIT License — See the [LICENSE](LICENSE.md) file for details.
 
 ## 📞 Support & Contact
 
@@ -384,11 +406,6 @@ Built with ❤️ for efficiency, reliability, and zero-touch automation.
 [⭐ Star this repo](https://github.com/Pnwcomputers/DeployWorkstation) if it saved you time and effort!
 
 ---
-*Updated July 2026*
-*Tested on Windows 10 (1909+) and Windows 11 - Pro & Home Editions*
- 
-[⭐ Star this repo](https://github.com/Pnwcomputers/DeployWorkstation) if it saved you time and effort!
- 
----
-*Updated June 2026*
-*Tested on Windows 10 (1909+) and Windows 11 - Pro & Home Editions*
+
+*Updated August 2026*
+*Tested on Windows 10 (1909+) and Windows 11 — Pro & Home Editions*
