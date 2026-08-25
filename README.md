@@ -11,6 +11,7 @@
 ![Enterprise Ready](https://img.shields.io/badge/Enterprise-Ready-purple)
 ![GitHub issues](https://img.shields.io/github/issues/Pnwcomputers/DeployWorkstation)
 ![Maintenance](https://img.shields.io/badge/Maintained-Yes-green)
+<img src="https://img.shields.io/github/downloads/Pnwcomputers/DeployWorkstation/total.svg">
 
 ### **Zero-Touch Windows Workstation Provisioning & Maintenance Toolkit**
 
