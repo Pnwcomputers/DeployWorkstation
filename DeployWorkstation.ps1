@@ -665,7 +665,7 @@ function Get-WingetVersionString {
 function Test-WingetVersionOk {
     param([string]$VersionString)
     try   { return ([Version]$VersionString -ge $script:WingetMinVersion) }
-    catch { return $true }   # unparseable version string — assume current
+    catch { return $true }   # unparsable version string — assume current
 }
 
 function Test-WingetReady {

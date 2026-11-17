@@ -16,3 +16,5 @@ jobs:
         uses: codespell-project/actions-codespell@v2
         with:
           skip: .git,*.png,*.jpg
+          # Spanish (es-ES) strings, code identifiers, and the existing docs/COMPATABILITY.md file name
+          ignore_words_list: requiere,instale,administrar,inaccesible,accesible,informacion,pressenter,afterall,compatability
