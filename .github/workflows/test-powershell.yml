@@ -9,22 +9,48 @@ on:
 jobs:
   test:
     runs-on: windows-latest
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      
-    - name: Setup PowerShell
+
+    - name: Install Pester 5 (PowerShell 7)
       shell: pwsh
       run: |
         Set-PSRepository PSGallery -InstallationPolicy Trusted
-        Install-Module -Name Pester -Force -SkipPublisherCheck
-        
-    - name: Run Pester Tests
+        Install-Module -Name Pester -MinimumVersion 5.5.0 -Force -SkipPublisherCheck
+
+    - name: Install Pester 5 (Windows PowerShell 5.1)
+      shell: powershell
+      run: |
+        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force | Out-Null
+        Set-PSRepository PSGallery -InstallationPolicy Trusted
+        Install-Module -Name Pester -MinimumVersion 5.5.0 -Force -SkipPublisherCheck
+
+    - name: Run Pester Tests (PowerShell 7)
       shell: pwsh
       run: |
-        Invoke-Pester -Path "Tests/" -OutputFormat NUnitXml -OutputFile "TestResults.xml" -CI
-        
+        Import-Module Pester -MinimumVersion 5.5.0
+        $config = New-PesterConfiguration
+        $config.Run.Path                = 'tests'
+        $config.Run.Exit                = $true
+        $config.Output.Verbosity        = 'Detailed'
+        $config.TestResult.Enabled      = $true
+        $config.TestResult.OutputFormat = 'JUnitXml'
+        $config.TestResult.OutputPath   = 'TestResults.xml'
+        Invoke-Pester -Configuration $config
+
+    # The deployment script itself runs under Windows PowerShell 5.1, so test there too
+    - name: Run Pester Tests (Windows PowerShell 5.1)
+      shell: powershell
+      run: |
+        Import-Module Pester -MinimumVersion 5.5.0
+        $config = New-PesterConfiguration
+        $config.Run.Path         = 'tests'
+        $config.Run.Exit         = $true
+        $config.Output.Verbosity = 'Detailed'
+        Invoke-Pester -Configuration $config
+
     - name: Publish Test Results
       uses: dorny/test-reporter@v1
       if: always()
@@ -32,7 +58,7 @@ jobs:
         name: PowerShell Tests
         path: TestResults.xml
         reporter: java-junit
-        
+
     - name: Upload Test Results
       uses: actions/upload-artifact@v4
       if: always()
