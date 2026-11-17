@@ -3,12 +3,17 @@ on:
   issues:
     types: [opened]
 
+permissions:
+  contents: read   # issue-labeler reads .github/labeler.yml via the API
+  issues: write    # needed to add labels
+
 jobs:
   label:
     runs-on: ubuntu-latest
     steps:
       - name: Auto label
-        uses: github/issue-labeler@v3
+        uses: github/issue-labeler@v3.5   # no floating "v3" tag exists upstream
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           configuration-path: .github/labeler.yml
+          enable-versioned-regex: 0
