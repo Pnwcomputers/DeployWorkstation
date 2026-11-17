@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [5.4] - 2026-11-17
+
+### Fixed
+- McAfee removal: MSI uninstall strings got `/S /quiet` appended, which `msiexec` rejects with a hidden usage dialog — the run hung indefinitely. MSI entries now use `/X{GUID} /qn /norestart`, `QuietUninstallString` is preferred, uninstalls time out after 20 minutes, and real exit codes are checked (`3010`/`1641` = success + restart, `1605` = already gone)
+- Winget bootstrap: an outdated winget was re-registered at the same old version and treated as fixed; the version is now re-checked after every step, `Repair-WinGetPackageManager` is tried as a last resort, and an un-upgradable winget runs in compatibility mode (no 1.4+ flags) instead of failing every install
+- Package ID resolution no longer reports "ID not found" when `winget show` failed for another reason (offline, source error) — the install now surfaces the real error
+- `0x8A150102` (install in progress) and `0x8A150008` (download failed) are retried
+- Bloatware removal: `0x8A15010A` (restart required) was treated as "not installed"; restart-to-finish uninstalls are now OK + restart flag; the `winget list` exit code is used so nothing-installed patterns skip the uninstall attempt
+- Appx / capability counters only count removals that actually succeeded; protected system packages (`0x80073CFA`) are reported as skipped
+- HTML report showed version 5.2 and install counters during update runs
+- `DeployWorkstation.bat` printed `(none - full run` and a blank line for option 1 (unescaped parenthesis)
+- CI: every run failed before testing (`-OutputFormat` is not a Pester 5 parameter); test file fixed for Pester 5 discovery rules
+
+### Added
+- `-NoPause` switch for unattended runs; both launchers pass it and pause themselves
+- Exit codes: `0` success, `2` completed with warnings, `1` critical error; the `.bat` launcher reports each
+- Log and HTML report fall back to `%ProgramData%\DeployWorkstation` when the script folder is read-only
+- Unit tests (run against the script's real functions with a fake winget) for exit-code tables, ID resolution, retries, uninstall-string parsing, bloatware exit handling and the HTML report; CI now also runs under Windows PowerShell 5.1
+
+### Changed
+- `Get-AppxProvisionedPackage` is enumerated once per run instead of once per pattern (faster bloatware phase)
+- Install/update retry loops share one helper (`Invoke-WingetWithRetry`)
+
+---
+
+## [5.3] - 2026-08-18
+
+### Fixed
+- `.NET Framework` winget ID corrected to `Microsoft.DotNet.Framework.Runtime` (with fallback)
+- Reboot exit codes `0x8A150109` / `0x8A15010A` were misclassified as network errors and retried
+- Exit-code hex comments corrected against winget's `returnCodes.md`
+- `--exact` and `--disable-interactivity` added to winget install/upgrade
+- Update mode counted not-installed apps as failures
+
+### Added
+- Package ID auto-resolution (primary ID → fallback IDs → `winget search`)
+- `--include-unknown` on upgrades; `winget source update` before retrying hash mismatches
+
+---
+
 ## [5.2] - 2026-06-22
 
 ### Fixed

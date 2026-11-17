@@ -5,7 +5,7 @@ setlocal
 :start
 echo.
 echo ==========================================
-echo   DeployWorkstation Quick Start v5.2
+echo   DeployWorkstation Quick Start v5.4
 echo   Pacific Northwest Computers
 echo ==========================================
 echo.
@@ -29,25 +29,25 @@ goto invalid
 :full
 echo.
 echo Starting full deployment...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1" -NoPause
 goto end
 
 :apps_only
 echo.
 echo Installing applications only...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1" -SkipBloatwareRemoval -SkipSystemConfig
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1" -NoPause -SkipBloatwareRemoval -SkipSystemConfig
 goto end
 
 :config_only
 echo.
 echo Running system configuration only...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1" -SkipBloatwareRemoval -SkipAppInstall
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1" -NoPause -SkipBloatwareRemoval -SkipAppInstall
 goto end
 
 :update
 echo.
 echo Updating installed applications...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1" -SkipBloatwareRemoval -SkipSystemConfig -UpdateApps
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0DeployWorkstation.ps1" -NoPause -SkipBloatwareRemoval -SkipSystemConfig -UpdateApps
 goto end
 
 :invalid

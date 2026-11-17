@@ -19,7 +19,26 @@ A PowerShell-based, automated provisioning solution that transforms Windows 10 &
 
 ---
 
-# 📌 Version 5.3
+# 📌 Version 5.4
+
+## 🐛 Reliability Fixes in v5.4
+
+| # | Area | Issue | Fix |
+|---|------|-------|-----|
+| 1 | McAfee removal | `/S /quiet` was appended to MSI uninstall strings too; `msiexec` rejects `/S`, shows a hidden usage dialog, and the run hung forever. Every product was also logged "Removed" regardless of result. | MSI entries now run `msiexec /X{GUID} /qn /norestart`; `QuietUninstallString` is preferred when present; 20-minute timeout; real exit codes (`3010`/`1641` = success + restart). |
+| 2 | Winget bootstrap | An *outdated* winget was "re-registered" (same old version) and treated as fixed, so every install failed on the 1.4+ flags. | Version is re-checked after each bootstrap step; new last-resort step uses Microsoft's `Repair-WinGetPackageManager` (installs the VCLibs/UI.Xaml dependencies). If winget still can't be upgraded, the run continues in compatibility mode without the newer flags instead of failing every install. |
+| 3 | Package ID check | When the machine was offline, every app was reported as "Package ID not found". | Only a real "not found" result counts as a bad ID; anything else hands the install the original ID so the true (network) error and its retries surface. |
+| 4 | Retries | "Another installation is in progress" (`0x8A150102`, common right after first boot) and download failures (`0x8A150008`) were not retried. | Both are retried; install-in-progress waits 3× longer. |
+| 5 | Bloatware removal | `0x8A15010A` (restart required) was logged as "not installed"; restart-to-finish uninstalls were WARNs; the "nothing installed" check never fired. | Restart codes handled correctly and flagged; `winget list` exit code used to skip needless uninstall attempts. |
+| 6 | Counters | Appx and capability removals were counted even when they failed silently. | Counted only on success; protected system packages are reported as such. Fewer Get-AppxProvisionedPackage scans (one per run instead of one per pattern). |
+| 7 | Exit codes | Launcher always said "completed successfully", even when apps failed. | Script exits `0` (success), `2` (completed with warnings), `1` (critical error); the `.bat` launcher reports each. |
+| 8 | HTML report | Showed version 5.2; update runs showed install counters (always 0). | Real version; update counters (updated / failed / skipped) and a restart banner. |
+| 9 | Unattended use | Always waited for Enter, blocking RMM/scheduled runs; a critical error closed the window before it could be read. | New `-NoPause` switch (the launchers pass it and pause themselves); critical errors now pause too. |
+| 10 | Read-only media | A write-protected USB stick or share broke logging. | Log/report fall back to `%ProgramData%\DeployWorkstation`. |
+| 11 | CI | Every CI run since v5.3 failed before running a single test (`-OutputFormat` isn't valid in Pester 5). | Workflow uses the Pester 5 configuration API (PowerShell 7 and Windows PowerShell 5.1); 59 tests incl. new unit tests of exit-code handling, ID resolution, retries, uninstall-string parsing and the report. |
+
+<details>
+<summary>🐛 Bugs Fixed in v5.3</summary>
 
 ## 🐛 Bugs Fixed in v5.3
 
@@ -42,6 +61,8 @@ Winget package IDs get renamed and retired over time. v5.3 verifies every ID aga
 Results are cached per run (install + update share the cache), adding only a few seconds to a full deployment.
 
 Other reliability improvements: `--include-unknown` on upgrades (handles apps whose installed version winget can't read — common after Windows Update services .NET runtimes out from under winget), and installer hash-mismatch errors now trigger a `winget source update` before retrying, since they're usually caused by a stale manifest.
+
+</details>
 
 <details>
 <summary>🐛 Bugs Fixed in v5.2</summary>
@@ -192,7 +213,7 @@ Other reliability improvements: `--include-unknown` on upgrades (handles apps wh
 
 ### Re-Running on Existing Machines
 
-v5.3 is safe to run on already-deployed workstations. The upgrade logic updates any managed apps with newer versions available via winget, skips apps that aren't installed on the machine, and picks up apps whose installed version winget can't read (`--include-unknown`).
+DeployWorkstation is safe to run on already-deployed workstations. The upgrade logic updates any managed apps with newer versions available via winget, skips apps that aren't installed on the machine, and picks up apps whose installed version winget can't read (`--include-unknown`).
 
 ```powershell
 # Update managed apps only
@@ -214,6 +235,15 @@ v5.3 is safe to run on already-deployed workstations. The upgrade logic updates 
 | `-UpdateApps` | Upgrade already-installed managed apps in-place |
 | `-LogPath <path>` | Custom path for the log file |
 | `-ReportPath <path>` | Custom path for the HTML report |
+| `-NoPause` | Don't wait for Enter at the end (for RMM, scheduled tasks, or scripted runs) |
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Completed successfully |
+| `2` | Completed with warnings — one or more apps or config keys failed (see log / HTML report) |
+| `1` | Critical error — the run stopped early (e.g. winget unavailable) |
 
 ### Adding Applications
 
@@ -408,5 +438,5 @@ Built with ❤️ for efficiency, reliability, and zero-touch automation.
 
 ---
 
-*Updated August 2026*
+*Updated November 2026*
 *Tested on Windows 10 (1909+) and Windows 11 — Pro & Home Editions*

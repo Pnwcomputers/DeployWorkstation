@@ -1,14 +1,14 @@
 @echo off
-title DeployWorkstation Launcher v5.3
+title DeployWorkstation Launcher v5.4
 REM ========================================================
 REM  DeployWorkstation.bat  -  Launcher for DeployWorkstation.ps1
-REM  Version 5.3 - PNWC Edition 6.22.2026
+REM  Version 5.4 - PNWC Edition 11.17.2026
 REM ========================================================
 
 setlocal enabledelayedexpansion
 
 echo.
-echo ===== DeployWorkstation Launcher v5.3 =====
+echo ===== DeployWorkstation Launcher v5.4 =====
 echo.
 
 REM 1) Check if we're already elevated
@@ -94,7 +94,7 @@ REM --------------------------------------------------------
 REM  Launch
 REM --------------------------------------------------------
 if "!ps_params!"=="" (
-    echo     Parameters : (none - full run)
+    echo     Parameters : ^(none - full run^)
 ) else (
     echo     Parameters : !ps_params!
 )
@@ -102,19 +102,21 @@ echo.
 echo Starting Windows PowerShell 5.1...
 echo.
 
-if "!ps_params!"=="" (
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "DeployWorkstation.ps1"
-) else (
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "DeployWorkstation.ps1" !ps_params!
-)
+REM -NoPause: this launcher pauses itself at the end
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "DeployWorkstation.ps1" -NoPause !ps_params!
+set "rc=!errorlevel!"
 
-REM 8) Check exit code and report results
-if %errorlevel% equ 0 (
-    echo.
+REM 8) Check exit code and report results (0 = success, 2 = warnings, other = error)
+echo.
+if "!rc!"=="0" (
     echo ===== Deployment completed successfully =====
+) else if "!rc!"=="2" (
+    echo ===== Deployment completed with warnings =====
+    echo     Some items failed - see the log and HTML report for details.
+    echo     Log file   : %~dp0DeployWorkstation.log
 ) else (
     echo ===== Deployment finished with errors =====
-    echo     Exit code  : %errorlevel%
+    echo     Exit code  : !rc!
     echo     Log file   : %~dp0DeployWorkstation.log
 )
 
