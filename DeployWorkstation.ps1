@@ -1,5 +1,5 @@
 # DeployWorkstation.ps1 – Optimized Win10/11 Setup & Clean-up
-# Version: 5.3 – PNWC Edition 6.22.2026
+# Version: 5.4 – PNWC Edition 11.17.2026
 # New in 5.0:  Write-Progress console bars, embedded en-US / es-ES localization
 # New in 5.1:  Winget auto-bootstrap, install retry logic, WU guard, OEM OneDrive, edition awareness
 # New in 5.11: App update mode (-UpdateApps), startup banner
@@ -12,6 +12,11 @@
 #              were misclassified as network errors and retried); reboot-required
 #              installs now count as success + end-of-run restart notice;
 #              --exact and --disable-interactivity on all winget install/upgrade calls
+# New in 5.4:  Reliability pass — outdated winget is actually upgraded (or used in
+#              compatibility mode), offline runs no longer misreport "ID not found",
+#              "install in progress" / download failures are retried, McAfee MSI
+#              uninstalls no longer hang, removal counters only count real removals,
+#              exit code 2 on warnings, -NoPause switch, log fallback to ProgramData
 
 #Requires -Version 5.1
 #Requires -RunAsAdministrator
@@ -23,13 +28,15 @@ param(
     [switch]$SkipAppInstall,
     [switch]$SkipBloatwareRemoval,
     [switch]$SkipSystemConfig,
-    [switch]$UpdateApps
+    [switch]$UpdateApps,
+    [switch]$NoPause
 )
 
 # ================================
 # Configuration & Setup
 # ================================
 
+$script:Version        = '5.4'
 $ErrorActionPreference = 'Continue'
 $ProgressPreference    = 'Continue'          # Must be Continue for Write-Progress to render
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
@@ -53,14 +60,33 @@ if ($PSVersionTable.PSEdition -eq 'Core') {
     if ($SkipBloatwareRemoval) { $params += '-SkipBloatwareRemoval' }
     if ($SkipSystemConfig)     { $params += '-SkipSystemConfig' }
     if ($UpdateApps)           { $params += '-UpdateApps' }
+    if ($NoPause)              { $params += '-NoPause' }
     Start-Process -FilePath 'powershell.exe' -ArgumentList $params -Verb RunAs
     exit
+}
+
+# --------------------------------
+# Log location — fall back to ProgramData when the script folder is read-only
+# (e.g. a write-protected USB stick or a read-only network share)
+# --------------------------------
+try {
+    $logDir = Split-Path $LogPath -Parent
+    if ($logDir -and -not (Test-Path $logDir)) {
+        New-Item -Path $logDir -ItemType Directory -Force -ErrorAction Stop | Out-Null
+    }
+    [System.IO.File]::AppendAllText($LogPath, '')
+}
+catch {
+    $fallbackDir = Join-Path $env:ProgramData 'DeployWorkstation'
+    New-Item -Path $fallbackDir -ItemType Directory -Force -ErrorAction SilentlyContinue | Out-Null
+    Write-Warning "Cannot write log to '$LogPath' ($($_.Exception.Message)). Using '$fallbackDir' instead."
+    $LogPath = Join-Path $fallbackDir (Split-Path $LogPath -Leaf)
 }
 
 # ── Startup Banner ───────────────────────────────────────────────────────────
 # Pure-ASCII art — no UTF-8 box-drawing chars. Safe on PS 5.1 regardless of
 # console codepage (some hosts decode as cp1252, producing mojibake with box-drawing).
-try { $host.UI.RawUI.WindowTitle = "DeployWorkstation v5.3" } catch {}
+try { $host.UI.RawUI.WindowTitle = "DeployWorkstation v$($script:Version)" } catch {}
 Clear-Host
 Write-Host ""
 Write-Host "  ######   ##  ##   ##    ##   ######" -ForegroundColor Cyan
@@ -73,7 +99,7 @@ Write-Host "  Pacific Northwest Computers" -ForegroundColor White
 Write-Host "  Windows Workstation Deployment Toolkit" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host ("=" * 70) -ForegroundColor DarkCyan
-Write-Host "   DeployWorkstation v5.3 -- Automated Win10/11 Setup & Hardening    " -ForegroundColor Cyan
+Write-Host "   DeployWorkstation v$($script:Version) -- Automated Win10/11 Setup & Hardening    " -ForegroundColor Cyan
 Write-Host "   Pacific Northwest Computers  |  jon@pnwcomputers.com               " -ForegroundColor Gray
 Write-Host "   Bloatware Removal  /  App Install  /  System Configuration         " -ForegroundColor DarkGray
 Write-Host ("=" * 70) -ForegroundColor DarkCyan
@@ -94,7 +120,7 @@ $script:Strings = @{
 
     'en-US' = @{
         # Startup
-        Started           = 'DeployWorkstation v5.3 Started'
+        Started           = 'DeployWorkstation v5.4 Started'
         WingetRequired    = "Winget is required. Install 'App Installer' from the Microsoft Store."
         WingetFound       = 'Winget found'
         WingetMissing     = 'Winget not found on PATH.'
@@ -185,7 +211,14 @@ $script:Strings = @{
         IdNotFound        = 'Package ID not found in winget source'
         IdChanged         = 'Package ID changed, using'
         IdCandidates      = 'Possible replacement IDs for'
+        IdUnverified      = 'Could not verify package ID (winget source unreachable?) - attempting anyway'
         SumReboot         = '*** One or more installs require a RESTART to finish ***'
+        SumAppsSkipped    = 'Apps skipped (not installed)'
+        WingetCompat      = 'Could not upgrade winget - continuing in compatibility mode with'
+        WingetRepair      = 'Attempting winget repair via Microsoft.WinGet.Client'
+        AppxProtected     = 'Protected system package, cannot be removed'
+        UninstallTimeout  = 'Uninstaller did not finish in time and was stopped'
+        McAfeeHint        = 'If McAfee remains, use the McAfee Consumer Product Removal tool (MCPR)'
         CapWuUnavail      = 'Skipped - Windows Update not accessible on this system'
         HomeEditionNote   = 'Policy key written but has no effect on Windows Home edition'
         OneDriveOem       = 'OneDrive OEM binary removal'
@@ -244,12 +277,15 @@ $script:Strings = @{
         HtmlConfigOK      = 'Config Keys Set'
         HtmlConfigFail    = 'Config Keys Failed'
         HtmlMcAfee        = 'McAfee Removed'
+        HtmlAppsUpdated   = 'Apps Updated / OK'
+        HtmlAppsUpdFail   = 'App Updates Failed'
+        HtmlAppsSkipped   = 'Apps Skipped'
         HtmlHrs           = 'hrs'
     }
 
     'es-ES' = @{
         # Startup
-        Started           = 'DeployWorkstation v5.3 Iniciado'
+        Started           = 'DeployWorkstation v5.4 Iniciado'
         WingetRequired    = "Se requiere Winget. Instale 'App Installer' desde Microsoft Store."
         WingetFound       = 'Winget encontrado'
         WingetMissing     = 'Winget no encontrado en el PATH.'
@@ -340,7 +376,14 @@ $script:Strings = @{
         IdNotFound        = 'ID de paquete no encontrado en la fuente winget'
         IdChanged         = 'ID de paquete cambiado, usando'
         IdCandidates      = 'Posibles IDs de reemplazo para'
+        IdUnverified      = 'No se pudo verificar el ID del paquete (fuente winget inaccesible?) - intentando de todos modos'
         SumReboot         = '*** Una o mas instalaciones requieren REINICIO para finalizar ***'
+        SumAppsSkipped    = 'Aplicaciones omitidas (no instaladas)'
+        WingetCompat      = 'No se pudo actualizar winget - continuando en modo de compatibilidad con'
+        WingetRepair      = 'Intentando reparar winget mediante Microsoft.WinGet.Client'
+        AppxProtected     = 'Paquete de sistema protegido, no se puede eliminar'
+        UninstallTimeout  = 'El desinstalador no termino a tiempo y fue detenido'
+        McAfeeHint        = 'Si McAfee permanece, use la herramienta McAfee Consumer Product Removal (MCPR)'
         CapWuUnavail      = 'Omitido - Windows Update no accesible en este sistema'
         HomeEditionNote   = 'Clave de politica escrita pero sin efecto en Windows Home'
         OneDriveOem       = 'Eliminacion de OneDrive OEM'
@@ -399,6 +442,9 @@ $script:Strings = @{
         HtmlConfigOK      = 'Claves de Config. Aplicadas'
         HtmlConfigFail    = 'Claves de Config. Fallidas'
         HtmlMcAfee        = 'McAfee Eliminados'
+        HtmlAppsUpdated   = 'Aplicaciones Actualizadas / OK'
+        HtmlAppsUpdFail   = 'Actualizaciones Fallidas'
+        HtmlAppsSkipped   = 'Aplicaciones Omitidas'
         HtmlHrs           = 'hrs'
     }
 }
@@ -435,11 +481,6 @@ function ConvertTo-HtmlSafe {
 # Logging
 # ================================
 
-$logDir = Split-Path $LogPath -Parent
-if ($logDir -and -not (Test-Path $logDir)) {
-    New-Item -Path $logDir -ItemType Directory -Force | Out-Null
-}
-
 $script:EventLog = [System.Collections.Generic.List[hashtable]]::new()
 
 function Write-Log {
@@ -459,7 +500,8 @@ function Write-Log {
         default   { 'Gray'   }
     }
     Write-Host $logEntry -ForegroundColor $color
-    Add-Content -Path $LogPath -Value $logEntry -Encoding UTF8
+    # Never let a log-file hiccup (USB pulled, AV lock) interrupt the deployment
+    Add-Content -Path $LogPath -Value $logEntry -Encoding UTF8 -ErrorAction SilentlyContinue
     $script:EventLog.Add(@{ Timestamp = $timestamp; Level = $Level; Message = $Message })
 }
 
@@ -512,6 +554,9 @@ $script:Summary = @{
 }
 
 $script:Results = [System.Collections.Generic.List[hashtable]]::new()
+
+# Update mode replaces the install phase, so summaries show update counters instead
+$script:UpdateMode = [bool]($UpdateApps -and -not $SkipAppInstall)
 
 # Applications managed by DeployWorkstation — used by both Install-StandardApps and Update-InstalledApps
 #   Id        : primary winget package ID (verified against the winget source at run time)
@@ -604,62 +649,93 @@ function Set-RegistryValue {
 # Winget Management
 # ================================
 
-function Install-WingetIfNeeded {
-    # Minimum usable winget version
-    # (1.4+ required for --disable-interactivity and --include-unknown)
-    $minVersion = [Version]'1.4.0'
+# Minimum winget version for the flags this script relies on
+# (--disable-interactivity and --include-unknown arrived in winget 1.4)
+$script:WingetMinVersion = [Version]'1.4.0'
 
-    Set-PhaseProgress -Activity (T 'ProgWingetCheck') -Status (T 'Checking') -Current 1 -Total 3
+# $false only when bootstrap could not bring winget up to $WingetMinVersion —
+# the newer flags are then left off so an old winget still works
+$script:WingetModern = $true
 
-    # --- Check existing winget ---
-    $needsInstall = $false
-    $wingetCmd    = Get-Command winget -ErrorAction SilentlyContinue
+function Get-WingetVersionString {
+    $out = winget --version 2>$null
+    ((@($out) | Where-Object { "$_" -match '\d+\.\d+' } | Select-Object -Last 1) -replace '[^\d\.]', '').Trim('.')
+}
 
-    if (-not $wingetCmd) {
-        Write-Log (T 'WingetMissing') -Level 'WARN'
-        $needsInstall = $true
-    } else {
-        $rawVer = ((winget --version 2>$null) | Where-Object { $_ -match '[\d\.]' } | Select-Object -Last 1) -replace '[^\d\.]', ''
-        try {
-            if ([Version]$rawVer -lt $minVersion) {
-                Write-Log "$(T 'WingetOld'): v$rawVer (minimum $minVersion)" -Level 'WARN'
-                $needsInstall = $true
-            } else {
-                Write-Log "$(T 'WingetFound'): v$rawVer"
-            }
-        }
-        catch {
-            # Version string unparseable — assume it is adequate and continue
-            Write-Log "$(T 'WingetFound'): $rawVer"
-        }
+function Test-WingetVersionOk {
+    param([string]$VersionString)
+    try   { return ([Version]$VersionString -ge $script:WingetMinVersion) }
+    catch { return $true }   # unparseable version string — assume current
+}
+
+function Test-WingetReady {
+    # The App Installer alias folder can be missing from PATH in an elevated session
+    $aliasDir = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps'
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue) -and
+        (Test-Path $aliasDir) -and ($env:Path -notlike "*$aliasDir*")) {
+        $env:Path = "$env:Path;$aliasDir"
     }
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { return $false }
 
-    if (-not $needsInstall) {
-        Clear-PhaseProgress
+    $ver = Get-WingetVersionString
+    if (Test-WingetVersionOk -VersionString $ver) {
+        Write-Log "$(T 'WingetFound'): v$ver"
         return $true
     }
+    return $false
+}
+
+function Get-WingetCompatArgs {
+    param([ValidateSet('install','upgrade','uninstall')][string]$Verb)
+    if (-not $script:WingetModern) { return @() }
+    if ($Verb -eq 'upgrade') { return @('--include-unknown', '--disable-interactivity') }
+    return @('--disable-interactivity')
+}
+
+function Install-WingetIfNeeded {
+    Set-PhaseProgress -Activity (T 'ProgWingetCheck') -Status (T 'Checking') -Current 1 -Total 4
+
+    # --- Check existing winget ---
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        $rawVer = Get-WingetVersionString
+        if (Test-WingetVersionOk -VersionString $rawVer) {
+            Write-Log "$(T 'WingetFound'): v$rawVer"
+            Clear-PhaseProgress
+            return $true
+        }
+        Write-Log "$(T 'WingetOld'): v$rawVer (minimum $($script:WingetMinVersion))" -Level 'WARN'
+    } else {
+        Write-Log (T 'WingetMissing') -Level 'WARN'
+    }
+
+    Write-Log "$(T 'WingetBootstrap')..." -Level 'SECTION'
+
+    # Older Win10 builds default to TLS 1.0/1.1, which Microsoft download endpoints reject
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    } catch {}
 
     # --- Bootstrap Step 1: re-register existing package (works on most OEM builds) ---
-    Write-Log "$(T 'WingetBootstrap')..." -Level 'SECTION'
-    Set-PhaseProgress -Activity (T 'ProgWingetCheck') -Status (T 'WingetReRegister') -Current 2 -Total 3
-
+    Set-PhaseProgress -Activity (T 'ProgWingetCheck') -Status (T 'WingetReRegister') -Current 2 -Total 4
     try {
         Write-Log (T 'WingetReRegister')
         Add-AppxPackage -RegisterByFamilyName -MainPackage 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe' -ErrorAction Stop
         Start-Sleep -Seconds 3
-        $null = Get-Command winget -ErrorAction Stop
-        Write-Log (T 'WingetBootOK') -Level 'SUCCESS'
-        Clear-PhaseProgress
-        return $true
+        # Re-registering only restores the version already on disk, so verify it is new enough
+        if (Test-WingetReady) {
+            Write-Log (T 'WingetBootOK') -Level 'SUCCESS'
+            Clear-PhaseProgress
+            return $true
+        }
+        Write-Log 'Re-registration did not produce a winget at the minimum version' -Level 'WARN'
     }
     catch {
         Write-Log "Re-registration failed: $($_.Exception.Message)" -Level 'WARN'
     }
 
     # --- Bootstrap Step 2: download MSIX bundle from Microsoft ---
-    Set-PhaseProgress -Activity (T 'ProgWingetCheck') -Status (T 'WingetDownload') -Current 3 -Total 3
+    Set-PhaseProgress -Activity (T 'ProgWingetCheck') -Status (T 'WingetDownload') -Current 3 -Total 4
     $tempPath = Join-Path $env:TEMP 'AppInstaller.msixbundle'
-
     try {
         Write-Log (T 'WingetDownload')
 
@@ -670,22 +746,59 @@ function Install-WingetIfNeeded {
             (New-Object System.Net.WebClient).DownloadFile('https://aka.ms/getwinget', $tempPath)
         }
 
-        Add-AppxPackage -Path $tempPath -ErrorAction Stop
+        Add-AppxPackage -Path $tempPath -ForceApplicationShutdown -ErrorAction Stop
         Start-Sleep -Seconds 3
-        $null = Get-Command winget -ErrorAction Stop
-
-        Write-Log (T 'WingetBootOK') -Level 'SUCCESS'
-        Clear-PhaseProgress
-        return $true
+        if (Test-WingetReady) {
+            Write-Log (T 'WingetBootOK') -Level 'SUCCESS'
+            Clear-PhaseProgress
+            return $true
+        }
+        Write-Log 'App Installer bundle installed, but winget is still below the minimum version' -Level 'WARN'
     }
     catch {
-        Write-Log "$(T 'WingetBootFail'): $($_.Exception.Message)" -Level 'ERROR'
-        return $false
+        Write-Log "$(T 'WingetBootFail'): $($_.Exception.Message)" -Level 'WARN'
     }
     finally {
         Remove-Item $tempPath -Force -ErrorAction SilentlyContinue
-        Clear-PhaseProgress
     }
+
+    # --- Bootstrap Step 3: Microsoft's repair cmdlet (also installs VCLibs / UI.Xaml dependencies,
+    #     the usual reason Step 2 fails on LTSC and bare OEM images) ---
+    Set-PhaseProgress -Activity (T 'ProgWingetCheck') -Status (T 'WingetRepair') -Current 4 -Total 4
+    try {
+        Write-Log (T 'WingetRepair')
+        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ErrorAction Stop | Out-Null
+        if (-not (Get-Module -ListAvailable -Name Microsoft.WinGet.Client)) {
+            Install-Module -Name Microsoft.WinGet.Client -Repository PSGallery -Force -ErrorAction Stop
+        }
+        Import-Module Microsoft.WinGet.Client -ErrorAction Stop
+        $repairParams = @{ ErrorAction = 'Stop' }
+        if ((Get-Command Repair-WinGetPackageManager -ErrorAction Stop).Parameters.ContainsKey('AllUsers')) {
+            $repairParams.AllUsers = $true
+        }
+        Repair-WinGetPackageManager @repairParams | Out-Null
+        Start-Sleep -Seconds 3
+        if (Test-WingetReady) {
+            Write-Log (T 'WingetBootOK') -Level 'SUCCESS'
+            Clear-PhaseProgress
+            return $true
+        }
+    }
+    catch {
+        Write-Log "$(T 'WingetBootFail'): $($_.Exception.Message)" -Level 'WARN'
+    }
+
+    Clear-PhaseProgress
+
+    # An older winget is still far better than aborting the whole run
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        $script:WingetModern = $false
+        Write-Log "$(T 'WingetCompat') v$(Get-WingetVersionString)" -Level 'WARN'
+        return $true
+    }
+
+    Write-Log (T 'WingetBootFail') -Level 'ERROR'
+    return $false
 }
 
 function Initialize-WingetSources {
@@ -737,6 +850,8 @@ $script:WingetRebootOkCodes = @(
 #  versions retried them as "network errors", masking the real condition)
 $script:WingetTransientCodes = @(
     -1978334969,  # 0x8A150107 INSTALL_NO_NETWORK
+    -1978334974,  # 0x8A150102 INSTALL_IN_PROGRESS (another installer is running — common right after OOBE)
+    -1978335224,  # 0x8A150008 DOWNLOAD_FAILED
     -1978335215,  # 0x8A150011 INSTALLER_HASH_MISMATCH (often a stale manifest/CDN race — refresh + retry once)
     -2147012894,  # 0x80072EE2 WinHTTP timeout
     -2147012887,  # 0x80072EE9 connection reset by peer
@@ -748,34 +863,53 @@ $script:WingetTransientCodes = @(
 # Package ID missing from source — triggers ID re-resolution, never a retry
 $script:WingetNotFoundCode = -1978335212   # 0x8A150014 NO_APPLICATIONS_FOUND
 
+# Another install holds the Windows Installer lock — wait longer than a network blip before retrying
+$script:WingetInstallInProgressCode = -1978334974   # 0x8A150102
+
+function Format-WingetExitCode {
+    param([int]$ExitCode)
+    '0x{0:X8}' -f ($ExitCode -band 0xFFFFFFFFL)
+}
+
 function Get-WingetFailReason {
     param([int]$ExitCode)
     switch ($ExitCode) {
-        -1978335215 { 'Installer hash mismatch — manifest may be stale; check proxy/AV'  }  # 0x8A150011
+        -1978335224 { 'Installer download failed (all retries exhausted)'                 }  # 0x8A150008
+        -1978335215 { 'Installer hash mismatch - manifest may be stale; check proxy/AV'  }  # 0x8A150011
         -1978335212 { 'Package not found in winget source (ID may have changed)'          }  # 0x8A150014
+        -1978335211 { 'Multiple installed packages match this name'                       }  # 0x8A150015
+        -1978334975 { 'Application is running - close it and retry'                       }  # 0x8A150101
+        -1978334974 { 'Another installation is in progress (all retries exhausted)'       }  # 0x8A150102
         -1978334961 { 'Installer blocked by security policy'                              }  # 0x8A15010F
         -1978334960 { 'A dependency failed to install'                                    }  # 0x8A150110
-        -1978334959 { 'Application is in use — close it and retry'                        }  # 0x8A150111
+        -1978334959 { 'Application is in use - close it and retry'                        }  # 0x8A150111
         -1978334966 { 'Windows must be restarted before this app can install'             }  # 0x8A15010A
         -1978334971 { 'Disk full'                                                         }  # 0x8A150105
-        -1978334969 { 'Network failure — no connectivity (all retries exhausted)'         }  # 0x8A150107
-        -1978334955 { 'Installer returned a custom error — see winget log'                }  # 0x8A150115
-        -2147012894 { 'Network failure — timed out (all retries exhausted)'               }  # 0x80072EE2
-        -2147012887 { 'Network failure — connection reset (all retries exhausted)'        }  # 0x80072EE9
-        -2147012873 { 'Network failure — DNS not resolved (all retries exhausted)'        }  # 0x80072EF7
-        -2147012867 { 'Network failure — connection refused (all retries exhausted)'      }  # 0x80072EFD
-        -2147012889 { 'Network failure — WinHTTP error (all retries exhausted)'           }  # 0x80072EE7
-        default     { "Exit code $ExitCode (0x{0:X8})" -f ($ExitCode -band 0xFFFFFFFFL)   }
+        -1978334969 { 'Network failure -no connectivity (all retries exhausted)'         }  # 0x8A150107
+        -1978334955 { 'Installer returned a custom error - see winget log'                }  # 0x8A150115
+        -2147012894 { 'Network failure -timed out (all retries exhausted)'               }  # 0x80072EE2
+        -2147012887 { 'Network failure -connection reset (all retries exhausted)'        }  # 0x80072EE9
+        -2147012873 { 'Network failure -DNS not resolved (all retries exhausted)'        }  # 0x80072EF7
+        -2147012867 { 'Network failure -connection refused (all retries exhausted)'      }  # 0x80072EFD
+        -2147012889 { 'Network failure -WinHTTP error (all retries exhausted)'           }  # 0x80072EE7
+        default     { "Exit code $ExitCode ($(Format-WingetExitCode $ExitCode))"         }
     }
 }
 
 # Cache so install + update runs don't re-resolve the same app twice
 $script:ResolvedIds = @{}
 
-function Test-WingetIdExists {
+function Get-WingetIdStatus {
+    # Returns the `winget show` exit code: 0 = exists, $script:WingetNotFoundCode = missing,
+    # anything else = could not check (offline, source error, ...)
     param([string]$Id)
     $null = winget show --id $Id --exact --source winget --accept-source-agreements 2>&1
-    return ($LASTEXITCODE -eq 0)
+    return [int]$LASTEXITCODE
+}
+
+function Test-WingetIdExists {
+    param([string]$Id)
+    return ((Get-WingetIdStatus -Id $Id) -eq 0)
 }
 
 function Resolve-WingetPackageId {
@@ -790,11 +924,14 @@ function Resolve-WingetPackageId {
     if ($script:ResolvedIds.ContainsKey($App.Id)) { return $script:ResolvedIds[$App.Id] }
 
     # 1) Primary ID
-    if (Test-WingetIdExists -Id $App.Id) {
+    $primaryCode = Get-WingetIdStatus -Id $App.Id
+    if ($primaryCode -eq 0) {
         $script:ResolvedIds[$App.Id] = $App.Id
         return $App.Id
     }
-    Write-Log "$(T 'IdNotFound'): $($App.Id)" -Level 'WARN'
+    if ($primaryCode -eq $script:WingetNotFoundCode) {
+        Write-Log "$(T 'IdNotFound'): $($App.Id)" -Level 'WARN'
+    }
 
     # 2) Known fallback IDs
     foreach ($alt in @($App.Fallbacks)) {
@@ -831,8 +968,67 @@ function Resolve-WingetPackageId {
         Write-Log "$(T 'IdCandidates') '$($App.Name)': $($candidates -join ', ')" -Level 'WARN'
     }
 
+    # The primary ID was never confirmed missing — `winget show` itself failed (offline, source
+    # error). Hand back the primary ID uncached so the install reports the real error and gets
+    # the transient-error retries, instead of a misleading "ID not found".
+    if ($primaryCode -ne $script:WingetNotFoundCode) {
+        Write-Log "$(T 'IdUnverified'): $($App.Id) [$(Format-WingetExitCode $primaryCode)]" -Level 'WARN'
+        return $App.Id
+    }
+
     $script:ResolvedIds[$App.Id] = $null
     return $null
+}
+
+function Invoke-WingetWithRetry {
+    <#
+        Runs winget with the given arguments, retrying transient failures.
+        Returns @{ ExitCode; Output }. Codes in -StopCodes end the loop immediately.
+    #>
+    param(
+        [string[]]$Arguments,
+        [string]  $AppName,
+        [int[]]   $StopCodes     = @(),
+        [int]     $MaxRetries    = 2,
+        [int]     $RetryDelaySec = 10
+    )
+
+    $attempt = 0
+    do {
+        $attempt++
+        $output   = & winget @Arguments 2>&1
+        $exitCode = [int]$LASTEXITCODE
+
+        if ($exitCode -eq 0 -or
+            $exitCode -in $StopCodes -or
+            $exitCode -in $script:WingetOkCodes -or
+            $exitCode -in $script:WingetRebootOkCodes) { break }
+
+        if ($attempt -le $MaxRetries -and $exitCode -in $script:WingetTransientCodes) {
+            Write-Log "$(T 'InstallRetrying') ($attempt/$MaxRetries): $AppName [exit $exitCode]" -Level 'WARN'
+            # Hash mismatches are often a stale local manifest cache — refresh before retrying
+            if ($exitCode -eq -1978335215) { winget source update --name winget 2>$null | Out-Null }
+            $delay = if ($exitCode -eq $script:WingetInstallInProgressCode) { $RetryDelaySec * 3 } else { $RetryDelaySec }
+            Start-Sleep -Seconds $delay
+        } else {
+            break
+        }
+    } while ($true)
+
+    return @{ ExitCode = $exitCode; Output = $output }
+}
+
+function Write-WingetDiagnostics {
+    # Log the last clean lines of winget output — strip progress-bar/spinner noise
+    param($Output)
+    $diagLines = (@($Output) | Where-Object { "$_".Trim() }) | Select-Object -Last 8
+    foreach ($line in $diagLines) {
+        $clean = ("$line" -replace '[^ -~]', '').Trim()
+        if ($clean.Length -lt 8)          { continue }  # spinner chars: \|/-
+        if ($clean -match '^[\|/\-]+$')  { continue }  # pure spinner frame
+        if ($clean -match '^\s*\d+\s*MB') { continue }  # "141 MB / 143 MB" lines
+        Write-Log "  $clean" -Level 'WARN'
+    }
 }
 
 # ================================
@@ -844,11 +1040,12 @@ function Remove-WingetApps {
     Write-Log "--- $(T 'ProgBloatware') ---" -Level 'SECTION'
 
     # Winget exit codes that mean "nothing to uninstall" — treat as SKIPPED, not WARN
+    # (0x8A15010A is "restart required before install", NOT "not found" — handled below)
     $notFoundCodes = @(
-        -1978335212,  # 0x8A15002C  no package found to uninstall
-        -1978335189,  # 0x8A15002B  package not applicable / already gone
-        -1978334966   # 0x8A15010A  no installed package found
+        -1978335212,  # 0x8A150014  NO_APPLICATIONS_FOUND — nothing installed matches
+        -1978335189   # 0x8A15002B  UPDATE_NOT_APPLICABLE — package not applicable / already gone
     )
+    $compatArgs = Get-WingetCompatArgs -Verb 'uninstall'
 
     $total   = $AppPatterns.Count
     $current = 0
@@ -861,10 +1058,13 @@ function Remove-WingetApps {
 
         Write-Log "$(T 'Checking'): $pattern"
         try {
-            $found = winget list --name "$pattern" --accept-source-agreements 2>$null |
-                     Where-Object { $_ -and $_ -notmatch 'Name\s+Id\s+Version' -and $_.Trim() }
+            $listOut  = winget list --name "$pattern" --accept-source-agreements 2>$null
+            $listCode = [int]$LASTEXITCODE
+            $found    = $listOut | Where-Object { $_ -and $_ -notmatch 'Name\s+Id\s+Version' -and "$_".Trim() }
 
-            if (-not $found) {
+            # winget prints "No installed package found..." (a non-empty line) when nothing
+            # matches, so the exit code is the reliable signal; the text check stays as a backstop
+            if ($listCode -eq $script:WingetNotFoundCode -or -not $found) {
                 Write-Log "$(T 'NotFound'): $pattern"
                 Add-Result -Section (T 'PhaseBloatware') -Item $pattern -Status 'SKIPPED' -Detail (T 'NotInstalled')
                 continue
@@ -874,17 +1074,24 @@ function Remove-WingetApps {
                               -Status   "$(T 'Removing'): $pattern" `
                               -Current  $current -Total $total
 
-            winget uninstall --name "$pattern" --silent --force --accept-source-agreements 2>&1 | Out-Null
+            winget uninstall --name "$pattern" --silent --force --accept-source-agreements @compatArgs 2>&1 | Out-Null
+            $code = [int]$LASTEXITCODE
 
-            if ($LASTEXITCODE -eq 0) {
+            if ($code -eq 0) {
                 Write-Log "$(T 'Removed'): $pattern" -Level 'SUCCESS'
                 Add-Result -Section (T 'PhaseBloatware') -Item $pattern -Status 'OK' -Detail (T 'Removed')
-            } elseif ($LASTEXITCODE -in $notFoundCodes) {
+            } elseif ($code -in $script:WingetRebootOkCodes) {
+                Write-Log "$(T 'Removed'): $pattern - $(T 'RebootToFinish')" -Level 'SUCCESS'
+                Add-Result -Section (T 'PhaseBloatware') -Item $pattern -Status 'OK' -Detail (T 'RebootToFinish')
+                $script:Summary.RebootNeeded = $true
+            } elseif ($code -in $notFoundCodes) {
                 Write-Log "$(T 'NotFound'): $pattern"
                 Add-Result -Section (T 'PhaseBloatware') -Item $pattern -Status 'SKIPPED' -Detail (T 'NotInstalled')
             } else {
-                Write-Log "$(T 'RemoveExitCode') $LASTEXITCODE for: $pattern" -Level 'WARN'
-                Add-Result -Section (T 'PhaseBloatware') -Item $pattern -Status 'WARN' -Detail "$(T 'RemoveExitCode') $LASTEXITCODE"
+                if ($code -eq -1978334966) { $script:Summary.RebootNeeded = $true }  # 0x8A15010A restart first
+                $reason = Get-WingetFailReason -ExitCode $code
+                Write-Log "$(T 'RemoveExitCode') $code for: $pattern - $reason" -Level 'WARN'
+                Add-Result -Section (T 'PhaseBloatware') -Item $pattern -Status 'WARN' -Detail $reason
             }
         }
         catch {
@@ -917,33 +1124,69 @@ function Remove-AppxPackages {
     $total   = $packagesToRemove.Count
     $current = 0
 
+    # Enumerating provisioned packages takes several seconds — do it once, not per pattern
+    $allProvPkgs = @(Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue)
+
     foreach ($pattern in $packagesToRemove) {
         $current++
         $label = $pattern.Replace('*','')
         Set-PhaseProgress -Activity (T 'ProgAppx') -Status $label -Current $current -Total $total
 
         try {
-            $removed = 0
+            $removed   = 0
+            $failed    = 0
+            $protected = 0
+            $lastError = ''
 
             $pkgs = Get-AppxPackage -AllUsers -Name $pattern -ErrorAction SilentlyContinue
             foreach ($pkg in $pkgs) {
                 Write-Log "$(T 'AppxRemoving'): $($pkg.Name)"
-                Remove-AppxPackage -Package $pkg.PackageFullName -AllUsers -ErrorAction SilentlyContinue
-                $script:Summary.AppxRemoved++
-                $removed++
+                try {
+                    Remove-AppxPackage -Package $pkg.PackageFullName -AllUsers -ErrorAction Stop
+                    $script:Summary.AppxRemoved++
+                    $removed++
+                }
+                catch {
+                    # 0x80073CFA = component of Windows that cannot be uninstalled — expected, not a fault
+                    if ($_.Exception.Message -match '0x80073CFA') {
+                        Write-Log "$(T 'AppxProtected'): $($pkg.Name)"
+                        $protected++
+                    } else {
+                        Write-Log "$(T 'RemoveError') $($pkg.Name): $($_.Exception.Message)" -Level 'WARN'
+                        $lastError = $_.Exception.Message
+                        $failed++
+                    }
+                }
             }
 
-            $provPkgs = Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue |
-                        Where-Object { $_.DisplayName -like $pattern }
+            $provPkgs = $allProvPkgs | Where-Object { $_.DisplayName -like $pattern }
             foreach ($pkg in $provPkgs) {
                 Write-Log "$(T 'AppxProvRemoving'): $($pkg.DisplayName)"
-                Remove-AppxProvisionedPackage -Online -PackageName $pkg.PackageName -ErrorAction SilentlyContinue
-                $script:Summary.AppxRemoved++
-                $removed++
+                try {
+                    Remove-AppxProvisionedPackage -Online -PackageName $pkg.PackageName -ErrorAction Stop | Out-Null
+                    $script:Summary.AppxRemoved++
+                    $removed++
+                }
+                catch {
+                    Write-Log "$(T 'RemoveError') $($pkg.DisplayName): $($_.Exception.Message)" -Level 'WARN'
+                    $lastError = $_.Exception.Message
+                    $failed++
+                }
             }
 
-            $status = if ($removed -gt 0) { 'OK' } else { 'SKIPPED' }
-            $detail = if ($removed -gt 0) { "$(T 'Removed') $removed" } else { T 'NotInstalled' }
+            if ($failed -gt 0) {
+                $status = if ($removed -gt 0) { 'OK' } else { 'WARN' }
+                $detail = "$(T 'Removed') $removed, $(T 'InstallFail') $failed - $lastError"
+            } elseif ($removed -gt 0) {
+                $status = 'OK'
+                $detail = "$(T 'Removed') $removed"
+            } elseif ($protected -gt 0) {
+                $status = 'SKIPPED'
+                $detail = T 'AppxProtected'
+            } else {
+                $status = 'SKIPPED'
+                $detail = T 'NotInstalled'
+            }
             Add-Result -Section (T 'ProgAppx') -Item $label -Status $status -Detail $detail
         }
         catch {
@@ -992,7 +1235,8 @@ function Remove-WindowsCapabilities {
             $state = Get-WindowsCapability -Online -Name $cap -ErrorAction SilentlyContinue
             if ($state -and $state.State -eq 'Installed') {
                 Write-Log "$(T 'CapRemoving'): $cap"
-                Remove-WindowsCapability -Online -Name $cap -ErrorAction SilentlyContinue | Out-Null
+                $capResult = Remove-WindowsCapability -Online -Name $cap -ErrorAction Stop
+                if ($capResult -and $capResult.RestartNeeded) { $script:Summary.RebootNeeded = $true }
                 $script:Summary.CapabilitiesRemoved++
                 Add-Result -Section (T 'ProgCaps') -Item $cap -Status 'OK' -Detail (T 'Removed')
             } else {
@@ -1009,8 +1253,97 @@ function Remove-WindowsCapabilities {
     Clear-PhaseProgress
 }
 
+function Get-UninstallCommand {
+    <#
+        Turns a registry UninstallString / QuietUninstallString into a silent command.
+        Returns @{ FilePath; Arguments; IsMsi } or $null.
+        MSI entries become `msiexec /X{GUID} /qn /norestart` — the old blanket "/S /quiet"
+        made msiexec show a (hidden) usage dialog and wait forever.
+    #>
+    param(
+        [string]$UninstallString,
+        [string]$QuietUninstallString
+    )
+
+    $useQuiet = [bool]$QuietUninstallString
+    $raw      = if ($useQuiet) { $QuietUninstallString.Trim() } elseif ($UninstallString) { $UninstallString.Trim() } else { '' }
+    if (-not $raw) { return $null }
+
+    if ($raw -match '^"([^"]+)"\s*(.*)$') {
+        $exe = $Matches[1]; $exeArgs = $Matches[2]
+    } elseif ($raw -match '^(.+?\.exe)(?:\s+(.*))?$') {
+        # Unquoted path that may contain spaces, e.g. C:\Program Files\McAfee\uninst.exe /x
+        $exe = $Matches[1]; $exeArgs = "$($Matches[2])"
+    } else {
+        $parts   = $raw.Split(' ', 2)
+        $exe     = $parts[0]
+        $exeArgs = if ($parts.Length -gt 1) { $parts[1] } else { '' }
+    }
+    $exe     = $exe.Trim()
+    $exeArgs = $exeArgs.Trim()
+
+    $isMsi = (Split-Path $exe -Leaf) -match '^msiexec(\.exe)?$'
+    if ($isMsi) {
+        if ($raw -match '\{[0-9A-Fa-f\-]{36}\}') {
+            $exeArgs = "/X$($Matches[0]) /qn /norestart"
+        } elseif ($exeArgs -notmatch '/q') {
+            $exeArgs = "$exeArgs /qn /norestart".Trim()
+        }
+    } elseif (-not $useQuiet -and $exeArgs -notmatch '/S|/silent|/quiet') {
+        $exeArgs = "$exeArgs /S /quiet".Trim()
+    }
+
+    return @{ FilePath = $exe; Arguments = $exeArgs; IsMsi = $isMsi }
+}
+
+function Wait-ProcessTree {
+    <#
+        Waits for a process AND any child processes it spawned (matching Start-Process -Wait,
+        which many uninstallers rely on because they hand off to a child and exit).
+        Returns $true when everything exited, $false on timeout (remaining processes are stopped).
+    #>
+    param(
+        [System.Diagnostics.Process]$Process,
+        [int]$TimeoutSec
+    )
+
+    $deadline  = (Get-Date).AddSeconds($TimeoutSec)
+    # Only processes started after the root count as its children (guards against PID reuse)
+    $startTime = try { $Process.StartTime } catch { (Get-Date).AddMinutes(-1) }
+    $tree      = [System.Collections.Generic.HashSet[int]]::new()
+    [void]$tree.Add($Process.Id)
+
+    $remainingMs = [int][Math]::Max(0, ($deadline - (Get-Date)).TotalMilliseconds)
+    $rootExited  = $Process.WaitForExit($remainingMs)
+
+    while ($true) {
+        $procs = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+                   Where-Object { $_.CreationDate -ge $startTime })
+        do {
+            $added = $false
+            foreach ($p in $procs) {
+                if ($tree.Contains([int]$p.ParentProcessId) -and $tree.Add([int]$p.ProcessId)) { $added = $true }
+            }
+        } while ($added)
+
+        $alive = @($procs | Where-Object { $tree.Contains([int]$_.ProcessId) -and $_.ProcessId -ne $Process.Id })
+        if ($rootExited -and $alive.Count -eq 0) { return $true }
+
+        if ((Get-Date) -ge $deadline) {
+            if (-not $rootExited) { try { $Process.Kill() } catch {} }
+            foreach ($p in $alive) { Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue }
+            return $false
+        }
+
+        Start-Sleep -Seconds 2
+        if (-not $rootExited) { $rootExited = $Process.HasExited }
+    }
+}
+
 function Remove-McAfeeProducts {
     Write-Log "--- $(T 'ProgMcAfee') ---" -Level 'SECTION'
+
+    $uninstallTimeoutSec = 20 * 60
 
     Set-PhaseProgress -Activity (T 'ProgMcAfee') -Status (T 'Checking') -Current 1 -Total 2
 
@@ -1036,34 +1369,48 @@ function Remove-McAfeeProducts {
 
     foreach ($entry in $mcafeeEntries) {
         $current++
-        $displayName     = $entry.DisplayName
-        $uninstallString = $entry.UninstallString
+        $displayName = $entry.DisplayName
 
         Set-PhaseProgress -Activity (T 'ProgMcAfee') -Status $displayName -Current $current -Total $total
         Write-Log "$(T 'McAfeeFound'): $displayName"
 
-        if (-not $uninstallString) {
+        $cmd = Get-UninstallCommand -UninstallString $entry.UninstallString -QuietUninstallString $entry.QuietUninstallString
+        if (-not $cmd) {
             Write-Log "$(T 'McAfeeNoStr') for $displayName" -Level 'WARN'
             Add-Result -Section (T 'ProgMcAfee') -Item $displayName -Status 'WARN' -Detail (T 'McAfeeNoStr')
             continue
         }
 
         try {
-            if ($uninstallString -match '^"([^"]+)"\s*(.*)$') {
-                $exe           = $Matches[1]
-                $uninstallArgs = $Matches[2]
-            } else {
-                $parts         = $uninstallString.Split(' ', 2)
-                $exe           = $parts[0]
-                $uninstallArgs = if ($parts.Length -gt 1) { $parts[1] } else { '' }
-            }
-            if ($uninstallArgs -notmatch '/S|/silent|/quiet') { $uninstallArgs += ' /S /quiet' }
+            Write-Log "$(T 'McAfeeUninstall'): $displayName  [$($cmd.FilePath) $($cmd.Arguments)]"
+            $spParams = @{ FilePath = $cmd.FilePath; WindowStyle = 'Hidden'; PassThru = $true; ErrorAction = 'Stop' }
+            if ($cmd.Arguments) { $spParams.ArgumentList = $cmd.Arguments }
+            $proc = Start-Process @spParams
+            $null = $proc.Handle   # PS 5.1: ExitCode is only populated if the handle was opened before exit
 
-            Write-Log "$(T 'McAfeeUninstall'): $displayName"
-            Start-Process -FilePath $exe -ArgumentList $uninstallArgs -Wait -WindowStyle Hidden -ErrorAction Stop
-            Write-Log "$(T 'McAfeeRemoved'): $displayName" -Level 'SUCCESS'
-            $script:Summary.McAfeeRemoved++
-            Add-Result -Section (T 'ProgMcAfee') -Item $displayName -Status 'OK' -Detail (T 'McAfeeRemoved')
+            if (-not (Wait-ProcessTree -Process $proc -TimeoutSec $uninstallTimeoutSec)) {
+                Write-Log "$(T 'McAfeeFailed') $displayName`: $(T 'UninstallTimeout')" -Level 'ERROR'
+                Write-Log (T 'McAfeeHint') -Level 'WARN'
+                Add-Result -Section (T 'ProgMcAfee') -Item $displayName -Status 'FAILED' -Detail (T 'UninstallTimeout')
+                continue
+            }
+
+            $code = $proc.ExitCode
+            if ($code -in 0, 3010, 1641) {
+                # 3010 / 1641 = success, restart required / initiated
+                if ($code -ne 0) { $script:Summary.RebootNeeded = $true }
+                Write-Log "$(T 'McAfeeRemoved'): $displayName" -Level 'SUCCESS'
+                $script:Summary.McAfeeRemoved++
+                Add-Result -Section (T 'ProgMcAfee') -Item $displayName -Status 'OK' -Detail (T 'McAfeeRemoved')
+            } elseif ($code -eq 1605) {
+                # MSI: product is not installed (stale registry entry)
+                Write-Log "$(T 'NotInstalled'): $displayName"
+                Add-Result -Section (T 'ProgMcAfee') -Item $displayName -Status 'SKIPPED' -Detail (T 'NotInstalled')
+            } else {
+                Write-Log "$(T 'McAfeeFailed') $displayName`: exit code $code" -Level 'WARN'
+                Write-Log (T 'McAfeeHint') -Level 'WARN'
+                Add-Result -Section (T 'ProgMcAfee') -Item $displayName -Status 'WARN' -Detail "exit code $code - $(T 'McAfeeHint')"
+            }
         }
         catch {
             Write-Log "$(T 'McAfeeFailed') $displayName`: $($_.Exception.Message)" -Level 'ERROR'
@@ -1106,31 +1453,13 @@ function Install-StandardApps {
                 continue
             }
 
-            $attempt   = 0
-            $exitCode  = -1
-            $wingetOut = $null
-
-            do {
-                $attempt++
-                # Capture output rather than discarding it — logged on failure
-                $wingetOut = winget install --id $resolvedId --exact --source winget `
-                    --accept-package-agreements --accept-source-agreements `
-                    --silent --disable-interactivity 2>&1
-                $exitCode = $LASTEXITCODE
-
-                if ($exitCode -eq 0 -or
-                    $exitCode -in $script:WingetOkCodes -or
-                    $exitCode -in $script:WingetRebootOkCodes) { break }
-
-                if ($attempt -le $maxRetries -and $exitCode -in $script:WingetTransientCodes) {
-                    Write-Log "$(T 'InstallRetrying') ($attempt/$maxRetries): $($app.Name) [exit $exitCode]" -Level 'WARN'
-                    # Hash mismatches are often a stale local manifest cache — refresh before retrying
-                    if ($exitCode -eq -1978335215) { winget source update --name winget 2>$null | Out-Null }
-                    Start-Sleep -Seconds $retryDelaySec
-                } else {
-                    break
-                }
-            } while ($true)
+            $wingetArgs = @('install', '--id', $resolvedId, '--exact', '--source', 'winget',
+                            '--accept-package-agreements', '--accept-source-agreements', '--silent') +
+                          @(Get-WingetCompatArgs -Verb 'install')
+            $run       = Invoke-WingetWithRetry -Arguments $wingetArgs -AppName $app.Name `
+                             -MaxRetries $maxRetries -RetryDelaySec $retryDelaySec
+            $exitCode  = $run.ExitCode
+            $wingetOut = $run.Output
 
             if ($exitCode -eq 0) {
                 Write-Log "$(T 'InstallOK'): $($app.Name)" -Level 'SUCCESS'
@@ -1150,15 +1479,7 @@ function Install-StandardApps {
                 $failReason = Get-WingetFailReason -ExitCode $exitCode
                 if ($exitCode -eq -1978334966) { $script:Summary.RebootNeeded = $true }  # reboot-before-install
                 Write-Log "$(T 'InstallFail'): $($app.Name) - $failReason" -Level 'WARN'
-                # Log last clean lines of winget output — strip progress-bar/spinner noise
-                $diagLines = ($wingetOut | Where-Object { "$_".Trim() }) | Select-Object -Last 8
-                foreach ($line in $diagLines) {
-                    $clean = ("$line" -replace '[^ -~]', '').Trim()
-                    if ($clean.Length -lt 8)          { continue }  # spinner chars: \|/-
-                    if ($clean -match '^[\|/\-]+$')  { continue }  # pure spinner frame
-                    if ($clean -match '^\s*\d+\s*MB') { continue }  # "141 MB / 143 MB" lines
-                    Write-Log "  $clean" -Level 'WARN'
-                }
+                Write-WingetDiagnostics -Output $wingetOut
                 Add-Result -Section (T 'PhaseApps') -Item $app.Name -Status 'WARN' -Detail $failReason
                 $script:Summary.AppsFailed++
             }
@@ -1206,32 +1527,16 @@ function Update-InstalledApps {
                 continue
             }
 
-            $attempt   = 0
-            $exitCode  = -1
-            $wingetOut = $null
-
-            do {
-                $attempt++
-                # --include-unknown: upgrade apps whose installed version winget can't read
-                # (common after Windows Update services .NET runtimes out from under winget)
-                $wingetOut = winget upgrade --id $resolvedId --exact --source winget `
-                    --accept-package-agreements --accept-source-agreements `
-                    --include-unknown --silent --disable-interactivity 2>&1
-                $exitCode = $LASTEXITCODE
-
-                if ($exitCode -eq 0 -or
-                    $exitCode -eq $notInstalledCode -or
-                    $exitCode -in $script:WingetOkCodes -or
-                    $exitCode -in $script:WingetRebootOkCodes) { break }
-
-                if ($attempt -le $maxRetries -and $exitCode -in $script:WingetTransientCodes) {
-                    Write-Log "$(T 'InstallRetrying') ($attempt/$maxRetries): $($app.Name) [exit $exitCode]" -Level 'WARN'
-                    if ($exitCode -eq -1978335215) { winget source update --name winget 2>$null | Out-Null }
-                    Start-Sleep -Seconds $retryDelaySec
-                } else {
-                    break
-                }
-            } while ($true)
+            # --include-unknown (from Get-WingetCompatArgs): upgrade apps whose installed version
+            # winget can't read (common after Windows Update services .NET runtimes out from under winget)
+            $wingetArgs = @('upgrade', '--id', $resolvedId, '--exact', '--source', 'winget',
+                            '--accept-package-agreements', '--accept-source-agreements', '--silent') +
+                          @(Get-WingetCompatArgs -Verb 'upgrade')
+            $run       = Invoke-WingetWithRetry -Arguments $wingetArgs -AppName $app.Name `
+                             -StopCodes @($notInstalledCode) `
+                             -MaxRetries $maxRetries -RetryDelaySec $retryDelaySec
+            $exitCode  = $run.ExitCode
+            $wingetOut = $run.Output
 
             if ($exitCode -eq 0) {
                 Write-Log "$(T 'UpdateOK'): $($app.Name)" -Level 'SUCCESS'
@@ -1254,14 +1559,7 @@ function Update-InstalledApps {
                 $failReason = Get-WingetFailReason -ExitCode $exitCode
                 if ($exitCode -eq -1978334966) { $script:Summary.RebootNeeded = $true }
                 Write-Log "$(T 'UpdateFail'): $($app.Name) - $failReason" -Level 'WARN'
-                $diagLines = ($wingetOut | Where-Object { "$_".Trim() }) | Select-Object -Last 8
-                foreach ($line in $diagLines) {
-                    $clean = ("$line" -replace '[^ -~]', '').Trim()
-                    if ($clean.Length -lt 8)         { continue }
-                    if ($clean -match '^[\|/\-]+$')  { continue }
-                    if ($clean -match '^\s*\d+\s*MB') { continue }
-                    Write-Log "  $clean" -Level 'WARN'
-                }
+                Write-WingetDiagnostics -Output $wingetOut
                 Add-Result -Section (T 'PhaseUpdate') -Item $app.Name -Status 'WARN' -Detail $failReason
                 $script:Summary.AppsUpdateFailed++
             }
@@ -1427,6 +1725,24 @@ function Export-HtmlReport {
     $lEdition         = T 'HtmlEdition'
     $lBuild           = T 'HtmlBuild'
 
+    # Update mode replaces the install phase, so show its counters instead
+    if ($script:UpdateMode) {
+        $appCounters = @(
+            "<div class=`"counter-card`"><div class=`"num num-ok`">$($script:Summary.AppsUpdated)</div><div class=`"lbl`">$(T 'HtmlAppsUpdated')</div></div>"
+            "<div class=`"counter-card`"><div class=`"num num-fail`">$($script:Summary.AppsUpdateFailed)</div><div class=`"lbl`">$(T 'HtmlAppsUpdFail')</div></div>"
+            "<div class=`"counter-card`"><div class=`"num num-info`">$($script:Summary.AppsSkipped)</div><div class=`"lbl`">$(T 'HtmlAppsSkipped')</div></div>"
+        ) -join "`n  "
+    } else {
+        $appCounters = @(
+            "<div class=`"counter-card`"><div class=`"num num-ok`">$($script:Summary.AppsInstalled)</div><div class=`"lbl`">$lAppsOK</div></div>"
+            "<div class=`"counter-card`"><div class=`"num num-fail`">$($script:Summary.AppsFailed)</div><div class=`"lbl`">$lAppsFail</div></div>"
+        ) -join "`n  "
+    }
+
+    $rebootHtml = if ($script:Summary.RebootNeeded) {
+        "<div class=`"reboot`">$(ConvertTo-HtmlSafe (T 'SumReboot'))</div>"
+    } else { '' }
+
     $html = @"
 <!DOCTYPE html>
 <html lang="$resolvedLang">
@@ -1482,6 +1798,8 @@ function Export-HtmlReport {
   details summary { cursor: pointer; color: var(--accent); font-weight: 600;
                     font-size: 1.05rem; margin: 28px 0 12px; user-select: none; }
   footer { margin-top: 40px; color: var(--muted); font-size: 0.78rem; text-align: center; }
+  .reboot { background: rgba(245,158,11,.12); border: 1px solid var(--warn); color: var(--warn);
+            border-radius: 8px; padding: 12px 16px; font-weight: 600; margin-bottom: 28px; }
 </style>
 </head>
 <body>
@@ -1489,6 +1807,7 @@ function Export-HtmlReport {
 <h1>&#128187; $lHtmlTitle</h1>
 <div class="subtitle">$lGenerated $timestamp &nbsp;|&nbsp; Pacific Northwest Computers</div>
 <div class="badge">$OverallStatus</div>
+$rebootHtml
 
 <h2>$lSysInfo</h2>
 <div class="info-grid">
@@ -1500,14 +1819,13 @@ function Export-HtmlReport {
   <div class="info-card"><div class="label">$lRAM</div><div class="value">$ramGB GB</div></div>
   <div class="info-card"><div class="label">$lUptime</div><div class="value">$uptimeHrs $lHrs</div></div>
   <div class="info-card"><div class="label">$lRunTime</div><div class="value">$durationFmt</div></div>
-  <div class="info-card"><div class="label">$lVersion</div><div class="value">5.2</div></div>
+  <div class="info-card"><div class="label">$lVersion</div><div class="value">$($script:Version)</div></div>
   <div class="info-card"><div class="label">$lTechnician</div><div class="value">PNWC</div></div>
 </div>
 
 <h2>$lSummary</h2>
 <div class="counter-grid">
-  <div class="counter-card"><div class="num num-ok">$($script:Summary.AppsInstalled)</div><div class="lbl">$lAppsOK</div></div>
-  <div class="counter-card"><div class="num num-fail">$($script:Summary.AppsFailed)</div><div class="lbl">$lAppsFail</div></div>
+  $appCounters
   <div class="counter-card"><div class="num num-info">$($script:Summary.AppxRemoved)</div><div class="lbl">$lAppxRemoved</div></div>
   <div class="counter-card"><div class="num num-info">$($script:Summary.CapabilitiesRemoved)</div><div class="lbl">$lCapsRemoved</div></div>
   <div class="counter-card"><div class="num num-ok">$($script:Summary.HardeningApplied)</div><div class="lbl">$lConfigOK</div></div>
@@ -1544,11 +1862,22 @@ $($logRows -join "`n")
 
     try {
         Set-PhaseProgress -Activity (T 'PhaseReporting') -Status (T 'ProgReportWrite') -Current 3 -Total 3
-        $html | Set-Content -Path $ReportPath -Encoding UTF8 -Force
+        $html | Set-Content -Path $ReportPath -Encoding UTF8 -Force -ErrorAction Stop
         Write-Log "$(T 'ReportSaved'): $ReportPath" -Level 'SUCCESS'
     }
     catch {
         Write-Log "$(T 'ReportFail'): $($_.Exception.Message)" -Level 'WARN'
+        # Same fallback as the log: the script folder may be read-only
+        try {
+            $fallbackDir = Join-Path $env:ProgramData 'DeployWorkstation'
+            New-Item -Path $fallbackDir -ItemType Directory -Force -ErrorAction SilentlyContinue | Out-Null
+            $script:ReportPath = Join-Path $fallbackDir (Split-Path $ReportPath -Leaf)
+            $html | Set-Content -Path $script:ReportPath -Encoding UTF8 -Force -ErrorAction Stop
+            Write-Log "$(T 'ReportSaved'): $script:ReportPath" -Level 'SUCCESS'
+        }
+        catch {
+            Write-Log "$(T 'ReportFail'): $($_.Exception.Message)" -Level 'WARN'
+        }
     }
     finally {
         Clear-PhaseProgress
@@ -1564,9 +1893,10 @@ function Write-ConsoleSummary {
     Write-Log $border -Level 'SECTION'
     Write-Log (T 'SumTitle') -Level 'SECTION'
     Write-Log $border -Level 'SECTION'
-    if ($script:Summary.AppsUpdated -gt 0 -or $script:Summary.AppsUpdateFailed -gt 0) {
+    if ($script:UpdateMode) {
         Write-Log "$( (T 'SumAppsUpdated')    ) : $($script:Summary.AppsUpdated)"
         Write-Log "$( (T 'SumAppsUpdateFail') ) : $($script:Summary.AppsUpdateFailed)"
+        Write-Log "$( (T 'SumAppsSkipped')    ) : $($script:Summary.AppsSkipped)"
     } else {
         Write-Log "$( (T 'SumAppsOK')    ) : $($script:Summary.AppsInstalled)"
         Write-Log "$( (T 'SumAppsFail')  ) : $($script:Summary.AppsFailed)"
@@ -1589,6 +1919,9 @@ function Write-ConsoleSummary {
 # Overall progress weights (must total 100)
 # Phases: Init=5, Bloatware=35, Apps=40, Config=15, Report=5
 $script:PhasePct = @{ Init = 5; BloatStart = 5; BloatEnd = 40; AppsStart = 40; AppsEnd = 80; ConfigStart = 80; ConfigEnd = 95; Done = 100 }
+
+# Process exit code: 0 = success, 1 = critical error, 2 = completed with warnings
+$script:ExitCode = 0
 
 try {
     Set-OverallProgress -Status (T 'ManagingSources') -Percent $script:PhasePct.Init
@@ -1654,6 +1987,7 @@ try {
     } else {
         'SUCCESS'
     }
+    if ($overallStatus -eq 'WARNING') { $script:ExitCode = 2 }
 
     Set-OverallProgress -Status (T 'PhaseReporting') -Percent $script:PhasePct.ConfigEnd
     Export-HtmlReport -OverallStatus $overallStatus
@@ -1666,17 +2000,26 @@ try {
     if ($script:Summary.RebootNeeded) {
         Write-Host "`n$(T 'SumReboot')"         -ForegroundColor Yellow
     }
-    Write-Host "`n$(T 'PressEnter')"            -ForegroundColor Yellow
-    Read-Host | Out-Null
+    if (-not $NoPause) {
+        Write-Host "`n$(T 'PressEnter')"        -ForegroundColor Yellow
+        Read-Host | Out-Null
+    }
 }
 catch {
+    $script:ExitCode = 1
     Write-Log "$(T 'CriticalError'): $($_.Exception.Message)" -Level 'ERROR'
     try { Export-HtmlReport -OverallStatus 'FAILED' } catch {}
     Write-Host "`n*** $(T 'SetupFailed'): $LogPath ***" -ForegroundColor Red
-    exit 1
+    # Keep the window open so the error can be read (it closes on exit when relaunched elevated)
+    if (-not $NoPause) {
+        Write-Host "`n$(T 'PressEnter')"        -ForegroundColor Yellow
+        try { Read-Host | Out-Null } catch {}
+    }
 }
 finally {
     # Always clear progress bars — runs on success, failure, and Ctrl+C
     Write-Progress -Id 1 -Activity ' ' -Completed
     Write-Progress -Id 0 -Activity ' ' -Completed
 }
+
+exit $script:ExitCode
